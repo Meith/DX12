@@ -116,9 +116,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.c" />
+    <ClCompile Include="window_framework.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="linmath.h" />
+    <ClInclude Include="window_framework.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shaders\tri_pix_shader.hlsl">

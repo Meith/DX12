@@ -1,45 +1,30 @@
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-
 #include <d3d12.h>
 #include <dxgi1_5.h>
 #include <d3dcompiler.h>
 
-#include <assert.h>
-#include <stdio.h>
-
+#include "window_framework.h"
 #include "linmath.h"
+
+#include <assert.h>
 
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "dxguid.lib")
 #pragma comment (lib, "dxgi.lib")
 #pragma comment (lib, "d3dcompiler.lib")
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);
-
-int CALLBACK WinMain(HINSTANCE h_instance, HINSTANCE hprev_instance, LPSTR lp_cmd_line, int n_cmd_show)
+int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_line, int ncmd_show)
 {
-        // Fill in window class struct
-        WNDCLASSEX wc;
-        wc.cbSize = sizeof(WNDCLASSEX);
-        wc.style = CS_HREDRAW | CS_VREDRAW;
-        wc.lpfnWndProc = WindowProc;
-        wc.cbClsExtra = 0;
-        wc.cbWndExtra = 0;
-        wc.hInstance = h_instance;
-        wc.hIcon = NULL;
-        wc.hCursor = LoadCursor(h_instance, IDC_ARROW);
-        wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
-        wc.lpszMenuName = NULL;
-        wc.lpszClassName = "DX12WindowClass";
-        wc.hIconSm = NULL;
+        struct window_create_info wci;
+        wci.hinstance = hinstance;
+        wci.window_class_name = "DX12WindowClass";
+        wci.window_name = "DX12Window";
+        wci.x = 100;
+        wci.y = 100;
+        wci.width = 800;
+        wci.height = 600;
+        wci.ncmd_show = ncmd_show;
 
-        // Register window class struct
-        RegisterClassEx(&wc);
-
-        // Create the window
-        HWND hwnd = CreateWindowEx(0, wc.lpszClassName, "DX12Window", WS_OVERLAPPEDWINDOW, 100, 50, 800, 600, NULL, NULL, h_instance, NULL);
-        assert(hwnd);
+        HWND hwnd = create_window(&wci);
 
         HRESULT result;
 
@@ -654,17 +639,13 @@ int CALLBACK WinMain(HINSTANCE h_instance, HINSTANCE hprev_instance, LPSTR lp_cm
         scissor_rect.bottom = LONG_MAX;
 
         // Show window
-        ShowWindow(hwnd, n_cmd_show);
+        show_window(&wci, hwnd);
 
         // Message and render loop
         MSG msg;
         PeekMessage(&msg, NULL, 0, 0, PM_REMOVE);
         while (msg.message != WM_QUIT) {
-                // Run message loop
-                if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-                        TranslateMessage(&msg);
-                        DispatchMessage(&msg);
-                }
+                run_window_message_loop(&msg);
 
                 // Update constant per frame data
                 mat4x4 mvp;
@@ -885,22 +866,7 @@ int CALLBACK WinMain(HINSTANCE h_instance, HINSTANCE hprev_instance, LPSTR lp_cm
         debug2->lpVtbl->Release(debug2);
         #endif
 
-        DestroyWindow(hwnd);
-
-        UnregisterClass(wc.lpszClassName, wc.hInstance);
+        destroy_window(&wci, hwnd);
 
         return (int) msg.wParam;
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param)
-{
-        switch (msg)
-        {
-                case WM_DESTROY:
-                        PostQuitMessage(0);
-                        return 0;
-
-                default:
-                        return DefWindowProc(hwnd, msg, w_param, l_param);
-        }
 }
