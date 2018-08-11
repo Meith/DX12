@@ -24,12 +24,18 @@
     <ClCompile Include="window_framework.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="error.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="linmath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="window_framework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="error.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

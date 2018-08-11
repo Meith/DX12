@@ -3,6 +3,7 @@
 #include <d3dcompiler.h>
 
 #include "window_framework.h"
+#include "error.h"
 #include "linmath.h"
 
 #include <assert.h>
@@ -26,21 +27,17 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         HWND hwnd = create_window(&wci);
 
-        HRESULT result;
-
         // Enable debug layer
         #if defined(_DEBUG)
         ID3D12Debug2 *debug2;
-        result = D3D12GetDebugInterface(&IID_ID3D12Debug2, &debug2);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(D3D12GetDebugInterface(&IID_ID3D12Debug2, &debug2));
         debug2->lpVtbl->SetGPUBasedValidationFlags(debug2, D3D12_GPU_BASED_VALIDATION_FLAGS_NONE);
         #endif
 
         // Create D3D12 device
         ID3D12Device4 *device4;
-        result = D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device4, &device4);
-        assert(SUCCEEDED(result));
-
+        show_error_if_failed(D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device4, &device4));
+       
         // Describe command queue
         D3D12_COMMAND_QUEUE_DESC queue_desc;
         queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -50,8 +47,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Create queue
         ID3D12CommandQueue *command_queue;
-        result = device4->lpVtbl->CreateCommandQueue(device4, &queue_desc, &IID_ID3D12CommandQueue, &command_queue);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateCommandQueue(device4, &queue_desc, &IID_ID3D12CommandQueue, &command_queue));
 
         #define BUFFER_COUNT 2
 
@@ -80,7 +76,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Create a DXGI factory
         IDXGIFactory5 *factory5;
-        result = CreateDXGIFactory2(
+        show_error_if_failed(CreateDXGIFactory2(
                 #if defined (_DEBUG)
                 DXGI_CREATE_FACTORY_DEBUG,
                 #else
@@ -88,13 +84,11 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
                 #endif
                 &IID_IDXGIFactory5,
                 &factory5
-                );
-        assert(SUCCEEDED(result));
+                ));
 
         // Create swapchain
         IDXGISwapChain4 *swapchain4;
-        result = factory5->lpVtbl->CreateSwapChainForHwnd(factory5, (IUnknown *) command_queue, hwnd, &swapchain_desc1, &swapchain_fullscreen_desc, NULL, (IDXGISwapChain1 **) &swapchain4);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(factory5->lpVtbl->CreateSwapChainForHwnd(factory5, (IUnknown *) command_queue, hwnd, &swapchain_desc1, &swapchain_fullscreen_desc, NULL, (IDXGISwapChain1 **) &swapchain4));
 
         // Create render target descriptor heap description
         D3D12_DESCRIPTOR_HEAP_DESC rt_descriptor_heap_desc;
@@ -105,7 +99,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Create render target descriptor heap
         ID3D12DescriptorHeap *rt_descriptor_heap;
-        result = device4->lpVtbl->CreateDescriptorHeap(device4, &rt_descriptor_heap_desc, &IID_ID3D12DescriptorHeap, &rt_descriptor_heap);
+        show_error_if_failed(device4->lpVtbl->CreateDescriptorHeap(device4, &rt_descriptor_heap_desc, &IID_ID3D12DescriptorHeap, &rt_descriptor_heap));
 
         // Now that we have space, lets create render targets
         // We have two buffers in the swapchain, each will need a render target view
@@ -128,8 +122,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
         for (UINT i = 0; i < BUFFER_COUNT; ++i) {
                 // First get the buffer for which we are creating a render target view for
                 // This buffer can be stored on the heap as a general read/write resource
-                result = swapchain4->lpVtbl->GetBuffer(swapchain4, i, &IID_ID3D12Resource, &(rt_buffers[i]));
-                assert(SUCCEEDED(result));
+                show_error_if_failed(swapchain4->lpVtbl->GetBuffer(swapchain4, i, &IID_ID3D12Resource, &(rt_buffers[i])));
 
                 // Because we have two buffers, and we need to create two render target views, we need to make sure we are pointing at the correct position in the heap
                 rt_cpu_handle.ptr += i * rt_descriptor_heap_size;
@@ -145,8 +138,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
         // So that we can record commands for one frame while we wait for the other to get executed on the GPU
         ID3D12CommandAllocator *command_allocator[BUFFER_COUNT];
         for (UINT i = 0; i < BUFFER_COUNT; ++i) {
-                result = device4->lpVtbl->CreateCommandAllocator(device4, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, &command_allocator[i]);
-                assert(SUCCEEDED(result));
+                show_error_if_failed(device4->lpVtbl->CreateCommandAllocator(device4, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, &command_allocator[i]));
         }
 
         // Lets get our current back buffer for setting frame related commands
@@ -154,8 +146,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Create command lists
         ID3D12GraphicsCommandList3 *graphics_command_list3;
-        result = device4->lpVtbl->CreateCommandList(device4, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocator[back_buffer_index], NULL, &IID_ID3D12GraphicsCommandList3, &graphics_command_list3);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateCommandList(device4, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocator[back_buffer_index], NULL, &IID_ID3D12GraphicsCommandList3, &graphics_command_list3));
 
         // Command lists are created in record mode by default
         // We need to close them
@@ -165,8 +156,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
         // We create one fence value per frame for the same reasons as command allocator
         ID3D12Fence *fence;
         UINT64 fence_value[BUFFER_COUNT] = { 0 };
-        result = device4->lpVtbl->CreateFence(device4, fence_value[back_buffer_index], D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, &fence);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateFence(device4, fence_value[back_buffer_index], D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, &fence));
 
         // Create event handle for stalling cpu thread
         HANDLE fence_event;
@@ -238,8 +228,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
         // However, this one time use resource is created using CreateCommittedResource
         // This call creates the heap big enough for the resource and the resource itself
         ID3D12Resource *vert_buffer;
-        result = device4->lpVtbl->CreateCommittedResource(device4, &vert_buffer_heap_properties, D3D12_HEAP_FLAG_NONE, &vert_buffer_resc_desc, D3D12_RESOURCE_STATE_COPY_DEST, NULL, &IID_ID3D12Resource, &vert_buffer);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateCommittedResource(device4, &vert_buffer_heap_properties, D3D12_HEAP_FLAG_NONE, &vert_buffer_resc_desc, D3D12_RESOURCE_STATE_COPY_DEST, NULL, &IID_ID3D12Resource, &vert_buffer));
 
         // However we cannot directly upload our triangle vertex data to this heap and resource
         // Well, we could if we used an upload heap type
@@ -271,9 +260,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Lastly we can create the upload resource
         ID3D12Resource *vert_buffer_upload;
-        result = device4->lpVtbl->CreateCommittedResource(device4, &vert_buffer_upload_heap_properties, D3D12_HEAP_FLAG_NONE, &vert_buffer_upload_resc_desc, D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, &vert_buffer_upload);
-        assert(SUCCEEDED(result));
-
+        show_error_if_failed(device4->lpVtbl->CreateCommittedResource(device4, &vert_buffer_upload_heap_properties, D3D12_HEAP_FLAG_NONE, &vert_buffer_upload_resc_desc, D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, &vert_buffer_upload));
         // Now we can copy the data on the vertex upload buffer 
         void *vertex_data;
         vert_buffer_upload->lpVtbl->Map(vert_buffer_upload, 0, NULL, &vertex_data);
@@ -341,8 +328,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Finally, lets create the index buffer resource and it's heap
         ID3D12Resource *index_buffer;
-        result = device4->lpVtbl->CreateCommittedResource(device4, &index_buffer_heap_properties, D3D12_HEAP_FLAG_NONE, &index_buffer_resc_desc, D3D12_RESOURCE_STATE_COPY_DEST, NULL, &IID_ID3D12Resource, &index_buffer);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateCommittedResource(device4, &index_buffer_heap_properties, D3D12_HEAP_FLAG_NONE, &index_buffer_resc_desc, D3D12_RESOURCE_STATE_COPY_DEST, NULL, &IID_ID3D12Resource, &index_buffer));
 
         D3D12_HEAP_PROPERTIES index_buffer_upload_heap_properties;
         index_buffer_upload_heap_properties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -367,8 +353,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Lastly we can create the upload resource
         ID3D12Resource *index_buffer_upload;
-        result = device4->lpVtbl->CreateCommittedResource(device4, &index_buffer_upload_heap_properties, D3D12_HEAP_FLAG_NONE, &index_buffer_upload_resc_desc, D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, &index_buffer_upload);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateCommittedResource(device4, &index_buffer_upload_heap_properties, D3D12_HEAP_FLAG_NONE, &index_buffer_upload_resc_desc, D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, &index_buffer_upload));
 
         // Now we can copy the data on the index upload buffer 
         void *index_data;
@@ -406,8 +391,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Create heap for depth stencil buffer
         ID3D12DescriptorHeap *ds_heap;
-        result = device4->lpVtbl->CreateDescriptorHeap(device4, &ds_descriptor_heap_desc, &IID_ID3D12DescriptorHeap, &ds_heap);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateDescriptorHeap(device4, &ds_descriptor_heap_desc, &IID_ID3D12DescriptorHeap, &ds_heap));
 
         // Create the depth stencil buffer resource clear value
         D3D12_CLEAR_VALUE ds_clear_value;
@@ -439,8 +423,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Now we can create the committed resource for depth stencil buffer
         ID3D12Resource *ds_buffer;
-        result = device4->lpVtbl->CreateCommittedResource(device4, &ds_heap_properties, D3D12_HEAP_FLAG_NONE, &ds_resource_desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &ds_clear_value, &IID_ID3D12Resource, &ds_buffer);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateCommittedResource(device4, &ds_heap_properties, D3D12_HEAP_FLAG_NONE, &ds_resource_desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &ds_clear_value, &IID_ID3D12Resource, &ds_buffer));
 
         // Create depth stencil buffer view description
         D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc;
@@ -459,13 +442,11 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
         // Time to load the shaders
         ID3DBlob *shader_error_blob = NULL;
         ID3DBlob *vert_shader_blob;
-        result = D3DCompileFromFile(L"shaders\\tri_vert_shader.hlsl", NULL, NULL, "main", "vs_5_1", D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_WARNINGS_ARE_ERRORS, 0, &vert_shader_blob, &shader_error_blob);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(D3DCompileFromFile(L"shaders\\tri_vert_shader.hlsl", NULL, NULL, "main", "vs_5_1", D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_WARNINGS_ARE_ERRORS, 0, &vert_shader_blob, &shader_error_blob));
         assert(shader_error_blob == NULL);
 
         ID3DBlob *pix_shader_blob = NULL;
-        result = D3DCompileFromFile(L"shaders\\tri_pix_shader.hlsl", NULL, NULL, "main", "ps_5_1", D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_WARNINGS_ARE_ERRORS, 0, &pix_shader_blob, &shader_error_blob);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(D3DCompileFromFile(L"shaders\\tri_pix_shader.hlsl", NULL, NULL, "main", "ps_5_1", D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_WARNINGS_ARE_ERRORS, 0, &pix_shader_blob, &shader_error_blob));
         assert(shader_error_blob == NULL);
 
         // Lets setup the input layout
@@ -531,14 +512,12 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
         // This allows for offline root signature creation and therefore providing some opportunities for optimization
         ID3D10Blob *root_sig_blob;
         ID3D10Blob *root_sig_error_blob = NULL;
-        result = D3D12SerializeVersionedRootSignature(&root_sig_desc, &root_sig_blob, &root_sig_error_blob);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(D3D12SerializeVersionedRootSignature(&root_sig_desc, &root_sig_blob, &root_sig_error_blob));
         assert(root_sig_error_blob == NULL);
 
         // Now we can create the root signature
         ID3D12RootSignature *root_sig;
-        result = device4->lpVtbl->CreateRootSignature(device4, 0, root_sig_blob->lpVtbl->GetBufferPointer(root_sig_blob), root_sig_blob->lpVtbl->GetBufferSize(root_sig_blob), &IID_ID3D12RootSignature, &root_sig);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateRootSignature(device4, 0, root_sig_blob->lpVtbl->GetBufferPointer(root_sig_blob), root_sig_blob->lpVtbl->GetBufferSize(root_sig_blob), &IID_ID3D12RootSignature, &root_sig));
 
         // The last and final step for the setup of the graphics pipeline is to create a pipeline state object
         // Through the pipeline state object, we tell the GPU which parts of the pipeline we are going to be customizing
@@ -619,8 +598,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
 
         // Finally create the pipeline state object
         ID3D12PipelineState *graphics_pso;
-        result = device4->lpVtbl->CreateGraphicsPipelineState(device4, &graphics_pso_desc, &IID_ID3D12PipelineState, &graphics_pso);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(device4->lpVtbl->CreateGraphicsPipelineState(device4, &graphics_pso_desc, &IID_ID3D12PipelineState, &graphics_pso));
 
         // Now we need to create a view port for the screen we are going to be drawing to
         D3D12_VIEWPORT view_port;
@@ -730,8 +708,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
                 graphics_command_list3->lpVtbl->ResourceBarrier(graphics_command_list3, 1, &present_res_barrier);
 
                 // Close command list for execution
-                result = graphics_command_list3->lpVtbl->Close(graphics_command_list3);
-                assert(SUCCEEDED(result));
+                show_error_if_failed(graphics_command_list3->lpVtbl->Close(graphics_command_list3));
 
                 // Finally we have recorded all the commands we want to execute and the respective transitions required
                 // We can now execute the command list
@@ -749,8 +726,7 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
                 // In the event the other frame is also done and sent of the GPU, and the first is yet to be completed, we wait on the CPU side
                 // In order to do that, we first find out the fence value for the current buffer and signal the GPU
                 UINT64 current_fence_value = fence_value[back_buffer_index];
-                result = command_queue->lpVtbl->Signal(command_queue, fence, current_fence_value);
-                assert(SUCCEEDED(result));
+                show_error_if_failed(command_queue->lpVtbl->Signal(command_queue, fence, current_fence_value));
 
                 // Then we get the next frame's buffer index
                 back_buffer_index = swapchain4->lpVtbl->GetCurrentBackBufferIndex(swapchain4);
@@ -759,8 +735,8 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
                 // If the new frame is all clear to go, we don't need to wait, otherwise we do and we go into this if block to wait on the CPU side
                 if (fence->lpVtbl->GetCompletedValue(fence) < fence_value[back_buffer_index]) {
                         // If it's not reached that value yet on the GPU, set the event that needs to be fired when that value is reached
-                        result = fence->lpVtbl->SetEventOnCompletion(fence, fence_value[back_buffer_index], fence_event);
-                        assert(SUCCEEDED(result));
+                        show_error_if_failed(fence->lpVtbl->SetEventOnCompletion(fence, fence_value[back_buffer_index], fence_event));
+  
                         // On the CPU, we wait for that event to be fired
                         WaitForSingleObject(fence_event, INFINITE);
 
@@ -770,11 +746,9 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
                 fence_value[back_buffer_index] = current_fence_value + 1;
 
                 // Once the gpu is done executing we want to reset our command allocator and command list so that we can re use them
-                result = command_allocator[back_buffer_index]->lpVtbl->Reset(command_allocator[back_buffer_index]);
-                assert(SUCCEEDED(result));
-
-                result = graphics_command_list3->lpVtbl->Reset(graphics_command_list3, command_allocator[back_buffer_index], NULL);
-                assert(SUCCEEDED(result));
+                show_error_if_failed(command_allocator[back_buffer_index]->lpVtbl->Reset(command_allocator[back_buffer_index]));
+                
+                show_error_if_failed(graphics_command_list3->lpVtbl->Reset(graphics_command_list3, command_allocator[back_buffer_index], NULL));
         }
 
         // Updates the fence object to 'fence_value' *on the GPU*
@@ -782,14 +756,13 @@ int CALLBACK WinMain(HINSTANCE hinstance, HINSTANCE hprev_instance, LPSTR lpcmd_
         // The idea is that we will wait on the fence object to reach the fence_value before we start releasing resources on the CPU
         // Don't confuse this line to behave like it's already setting fence object to 'fence_value'
         // It's not, fence object's value is still what you initialised it with
-        result = command_queue->lpVtbl->Signal(command_queue, fence, fence_value[back_buffer_index]);
-        assert(SUCCEEDED(result));
+        show_error_if_failed(command_queue->lpVtbl->Signal(command_queue, fence, fence_value[back_buffer_index]));
 
         // Wait for fence object to reach updated fence_value on the CPU signaled from the GPU
         if (fence->lpVtbl->GetCompletedValue(fence) < fence_value[back_buffer_index]) {
                 // If it's not reached that value yet on the GPU, set the event that needs to be fired when that value is reached
-                result = fence->lpVtbl->SetEventOnCompletion(fence, fence_value[back_buffer_index], fence_event);
-                assert(SUCCEEDED(result));
+                show_error_if_failed(fence->lpVtbl->SetEventOnCompletion(fence, fence_value[back_buffer_index], fence_event));
+                
                 // On the CPU, we wait for that event to be fired
                 WaitForSingleObject(fence_event, INFINITE);
         }
