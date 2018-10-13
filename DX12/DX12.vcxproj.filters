@@ -21,10 +21,22 @@
     <ClCompile Include="main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="window_framework.c">
+    <ClCompile Include="error.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="error.c">
+    <ClCompile Include="camera_interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpu_interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh_interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="swapchain_interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="window_interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,10 +44,19 @@
     <ClInclude Include="linmath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="window_framework.h">
+    <ClInclude Include="error.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="error.h">
+    <ClInclude Include="gpu_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="swapchain_inerface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="window_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
