@@ -1,12 +1,13 @@
 #ifndef GPU_INTERFACE_H
 #define GPU_INTERFACE_H
 
-#include <d3d12Mod.h>
+// Including modified d3d12.h since their c interface is broken
+#include "d3d12.h"
 #include <d3dcompiler.h>
 
 
 struct gpu_device_info {
-        //ID3D12Debug *debug;
+        ID3D12Debug *debug;
         ID3D12Device *device;
 };
 

@@ -136,14 +136,6 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         record_copy_buffer_region_cmd(&copy_cmd_list_info, &vert_gpu_resource_info,
                 &vert_upload_resource_info);
 
-        signal_gpu(&copy_queue_info, &copy_fence_info, 0);
-
-        wait_for_gpu(&copy_fence_info, 0);
-
-        // Transition gpu shader resource from copy to vertex buffer
-        transition_resource(&render_cmd_list_info, &vert_gpu_resource_info,
-                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-
         // Resource for index buffer on the GPU for shader usage
         struct gpu_resource_info indices_gpu_resource_info;
         indices_gpu_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
@@ -159,6 +151,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 D3D12_RESOURCE_STATE_COPY_DEST;
         create_resource(&device_info, &indices_gpu_resource_info);
 
+        // Resource for uploading indices from CPU to GPU
         struct gpu_resource_info indices_upload_resource_info;
         indices_upload_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
         indices_upload_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -178,9 +171,19 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         record_copy_buffer_region_cmd(&copy_cmd_list_info,
                 &indices_gpu_resource_info, &indices_upload_resource_info);
 
+        // Close command list for execution
+        close_cmd_list(&copy_cmd_list_info);
+
+        // Exexute command list
+        execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
+
         signal_gpu(&copy_queue_info, &copy_fence_info, 0);
 
         wait_for_gpu(&copy_fence_info, 0);
+
+        // Transition gpu shader resource from copy to vertex buffer
+        transition_resource(&render_cmd_list_info, &vert_gpu_resource_info,
+            D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
         transition_resource(&render_cmd_list_info, &indices_gpu_resource_info,
                 D3D12_RESOURCE_STATE_INDEX_BUFFER);
