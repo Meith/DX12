@@ -13,12 +13,12 @@ void create_gpu_device(struct gpu_device_info *device_info)
         HRESULT result;
 
         // Enable debug layer
-        #if defined(_DEBUG)
+        /*#if defined(_DEBUG)
         result = D3D12GetDebugInterface(&IID_ID3D12Debug, 
                 &device_info->debug);
         show_error_if_failed(result); 
         device_info->debug->lpVtbl->EnableDebugLayer(device_info->debug);
-        #endif
+        #endif*/
 
         result = D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0, 
                 &IID_ID3D12Device, &device_info->device);
@@ -29,9 +29,9 @@ void release_gpu_device(struct gpu_device_info *device_info)
 {
         device_info->device->lpVtbl->Release(device_info->device);
 
-        #if defined(_DEBUG)
+        /*#if defined(_DEBUG)
         device_info->debug->lpVtbl->Release(device_info->debug);
-        #endif
+        #endif*/
 }
 
 

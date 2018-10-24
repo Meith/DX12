@@ -4,9 +4,7 @@
 #include <assert.h>
 
 void show_error_if_failed(HRESULT hr)
-{
-        //assert(hr == S_OK);
-        
+{  
         if (FAILED(hr)) {
                 #define MSG_LENGTH 265
                 char error_message[MSG_LENGTH];

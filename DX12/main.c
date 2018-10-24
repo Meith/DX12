@@ -28,6 +28,11 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         direct_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         create_cmd_queue(&device_info, &direct_queue_info);
 
+        // Create copy queue
+        struct gpu_cmd_queue_info copy_queue_info;
+        copy_queue_info.type = D3D12_COMMAND_LIST_TYPE_COPY;
+        create_cmd_queue(&device_info, &copy_queue_info);
+
         // Create swapchain
         struct swapchain_info swp_chain_info;
         swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -58,22 +63,38 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         create_rendertarget_view(&device_info, &rtv_descriptor_info,
                 rtv_resource_info);
 
-        // Create command allocators
-        struct gpu_cmd_allocator_info cmd_allocator_info;
-        cmd_allocator_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        cmd_allocator_info.cmd_allocator_count = swp_chain_info.buffer_count;
-        create_cmd_allocators(&device_info, &cmd_allocator_info);
+        // Create command allocators for draw commands
+        struct gpu_cmd_allocator_info render_cmd_allocator_info;
+        render_cmd_allocator_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        render_cmd_allocator_info.cmd_allocator_count = swp_chain_info.buffer_count;
+        create_cmd_allocators(&device_info, &render_cmd_allocator_info);
 
-        // Create command list
-        struct gpu_cmd_list_info cmd_list_info;
-        cmd_list_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        create_cmd_list(&device_info, &cmd_allocator_info, &cmd_list_info);
+        // Create command list for draw commands
+        struct gpu_cmd_list_info render_cmd_list_info;
+        render_cmd_list_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        create_cmd_list(&device_info, &render_cmd_allocator_info, &render_cmd_list_info);
 
-        // Create fence
-        struct gpu_fence_info fence_info;
-        fence_info.num_fence_value = swp_chain_info.buffer_count;
-        create_fence(&device_info, &fence_info);
+        // Create command allocators for copy commands
+        struct gpu_cmd_allocator_info copy_cmd_allocator_info;
+        copy_cmd_allocator_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_COPY;
+        copy_cmd_allocator_info.cmd_allocator_count = 1;
+        create_cmd_allocators(&device_info, &copy_cmd_allocator_info);
+
+        // Create command list for copy commands
+        struct gpu_cmd_list_info copy_cmd_list_info;
+        copy_cmd_list_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_COPY;
+        create_cmd_list(&device_info, &copy_cmd_allocator_info, &copy_cmd_list_info);
+
+        // Create fence for synchronizing frames of draw commands
+        struct gpu_fence_info render_fence_info;
+        render_fence_info.num_fence_value = swp_chain_info.buffer_count;
+        create_fence(&device_info, &render_fence_info);
  
+        // Create fence for synchronizing copy and direct queue
+        struct gpu_fence_info copy_fence_info;
+        copy_fence_info.num_fence_value = 1;
+        create_fence(&device_info, &copy_fence_info);
+
         // Create triangle mesh
         struct mesh_info triangle_mesh;
         create_triangle(&triangle_mesh);
@@ -112,11 +133,15 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         upload_resources(&vert_upload_resource_info, triangle_mesh.verticies);
 
         // Copy vertex data from upload resource to gpu shader resource
-        record_copy_buffer_region_cmd(&cmd_list_info, &vert_gpu_resource_info, 
+        record_copy_buffer_region_cmd(&copy_cmd_list_info, &vert_gpu_resource_info,
                 &vert_upload_resource_info);
 
+        signal_gpu(&copy_queue_info, &copy_fence_info, 0);
+
+        wait_for_gpu(&copy_fence_info, 0);
+
         // Transition gpu shader resource from copy to vertex buffer
-        transition_resource(&cmd_list_info, &vert_gpu_resource_info, 
+        transition_resource(&render_cmd_list_info, &vert_gpu_resource_info,
                 D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
         // Resource for index buffer on the GPU for shader usage
@@ -150,10 +175,14 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
         upload_resources(&indices_upload_resource_info, triangle_mesh.indices);
 
-        record_copy_buffer_region_cmd(&cmd_list_info, 
+        record_copy_buffer_region_cmd(&copy_cmd_list_info,
                 &indices_gpu_resource_info, &indices_upload_resource_info);
 
-        transition_resource(&cmd_list_info, &indices_gpu_resource_info,
+        signal_gpu(&copy_queue_info, &copy_fence_info, 0);
+
+        wait_for_gpu(&copy_fence_info, 0);
+
+        transition_resource(&render_cmd_list_info, &indices_gpu_resource_info,
                 D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
         // Create depth buffer descriptor 
@@ -258,7 +287,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         do {
                 window_msg = window_message_loop();
 
-                transition_resource(&cmd_list_info,
+                transition_resource(&render_cmd_list_info,
                         &rtv_resource_info[back_buffer_index],
                         D3D12_RESOURCE_STATE_RENDER_TARGET);
 
@@ -266,83 +295,88 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 update_cpu_handle(&rtv_descriptor_info, back_buffer_index);
 
                 // Set the render target and depth target
-                record_set_render_target_cmd(&cmd_list_info, &rtv_descriptor_info,
-                        &dsv_descriptor_info);
+                record_set_render_target_cmd(&render_cmd_list_info, 
+                        &rtv_descriptor_info, &dsv_descriptor_info);
 
                 // Clear render target
                 float clear_color[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-                record_clear_rtv_cmd(&cmd_list_info, &rtv_descriptor_info, 
-                        clear_color);
+                record_clear_rtv_cmd(&render_cmd_list_info, 
+                        &rtv_descriptor_info, clear_color);
 
                 // Clear depth target
-                record_clear_dsv_cmd(&cmd_list_info, &dsv_descriptor_info);
+                record_clear_dsv_cmd(&render_cmd_list_info,
+                        &dsv_descriptor_info);
 
                 // Set pipeline state
-                record_set_pipeline_state_cmd(&cmd_list_info, &pso_info);
+                record_set_pipeline_state_cmd(&render_cmd_list_info, 
+                        &pso_info);
 
                 // Set viewport
-                record_set_viewport_cmd(&cmd_list_info, &viewport_info);
+                record_set_viewport_cmd(&render_cmd_list_info, &viewport_info);
 
                 // Set scissor rect
-                record_set_scissor_rect_cmd(&cmd_list_info, &scissor_rect_info);
+                record_set_scissor_rect_cmd(&render_cmd_list_info, 
+                        &scissor_rect_info);
 
                 // Set primitve
-                record_set_primitive_cmd(&cmd_list_info);
+                record_set_primitive_cmd(&render_cmd_list_info);
 
                 // Set root signature
-                record_set_graphics_root_sig_cmd(&cmd_list_info, 
+                record_set_graphics_root_sig_cmd(&render_cmd_list_info,
                         &root_sig_info);
 
                 // Set root constant
-                record_set_root_constansts_cmd(&cmd_list_info, 0, &root_sig_info, 
-                        cam_info.pv_mat);
+                record_set_root_constansts_cmd(&render_cmd_list_info, 0, 
+                        &root_sig_info, cam_info.pv_mat);
 
                 // Set vertex buffer
-                record_set_vertex_buffer_cmd(&cmd_list_info, 
+                record_set_vertex_buffer_cmd(&render_cmd_list_info,
                         &vert_gpu_resource_info, sizeof (struct vertex));
 
                 // Set index buffer
-                record_set_index_buffer_cmd(&cmd_list_info, 
+                record_set_index_buffer_cmd(&render_cmd_list_info,
                         &indices_gpu_resource_info);
 
                 // Draw indexed instanced
-                record_draw_indexed_instance_cmd(&cmd_list_info, 
+                record_draw_indexed_instance_cmd(&render_cmd_list_info,
                         triangle_mesh.index_count, 1);
 
                 // Transition render target buffer to present state
-                transition_resource(&cmd_list_info, 
+                transition_resource(&render_cmd_list_info,
                         &rtv_resource_info[back_buffer_index], 
                         D3D12_RESOURCE_STATE_PRESENT);
 
                 // Close command list for execution
-                close_cmd_list(&cmd_list_info);
+                close_cmd_list(&render_cmd_list_info);
 
                 // Exexute command list
-                execute_cmd_list(&direct_queue_info, &cmd_list_info);
+                execute_cmd_list(&direct_queue_info, &render_cmd_list_info);
 
                 // Present swapchain
                 present_swapchain(&swp_chain_info);
 
                 // Signal GPU
-                signal_gpu(&direct_queue_info, &fence_info, back_buffer_index);
+                signal_gpu(&direct_queue_info, &render_fence_info, back_buffer_index);
 
                 // Get the next frame's buffer index
                 back_buffer_index = get_backbuffer_index(&swp_chain_info);
 
                 // Wait for gpu to finish previous frame
-                wait_for_gpu(&fence_info, back_buffer_index);
+                wait_for_gpu(&render_fence_info, back_buffer_index);
 
                 // Reset command allocator
-                reset_cmd_allocator(&cmd_allocator_info, back_buffer_index);
+                reset_cmd_allocator(&render_cmd_allocator_info, 
+                        back_buffer_index);
 
                 // Reset command list
-                reset_cmd_list(&cmd_allocator_info, &cmd_list_info, back_buffer_index);
+                reset_cmd_list(&render_cmd_allocator_info, 
+                        &render_cmd_list_info, back_buffer_index);
 
         } while (window_msg != WM_QUIT);
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(&direct_queue_info, &fence_info, back_buffer_index);
-        wait_for_gpu(&fence_info, back_buffer_index);
+        signal_gpu(&direct_queue_info, &render_fence_info, back_buffer_index);
+        wait_for_gpu(&render_fence_info, back_buffer_index);
 
         // Release grahics pipeline state object
         release_pso(&pso_info);
@@ -377,14 +411,23 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Release triangle data 
         release_triangle(&triangle_mesh);
 
-        // Release fence
-        release_fence(&fence_info);
+        // Release copy fence
+        release_fence(&copy_fence_info);
 
-        // Release command list
-        release_cmd_list(&cmd_list_info);
+        // Release render fence
+        release_fence(&render_fence_info);
 
-        // Release command allocator
-        release_cmd_allocators(&cmd_allocator_info);
+        // Release copy command list
+        release_cmd_list(&copy_cmd_list_info);
+
+        // Release render command list
+        release_cmd_list(&render_cmd_list_info);
+
+        // Release copy command allocator
+        release_cmd_allocators(&copy_cmd_allocator_info);
+
+        // Release render command allocator
+        release_cmd_allocators(&render_cmd_allocator_info);
 
         // Release the render target view buffers
         for (UINT i = 0; i < rtv_descriptor_info.num_descriptors; ++i) {
@@ -397,6 +440,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         release_descriptor(&rtv_descriptor_info);
 
         release_swapchain(&swp_chain_info);
+
+        release_cmd_queue(&copy_queue_info);
 
         release_cmd_queue(&direct_queue_info);
  

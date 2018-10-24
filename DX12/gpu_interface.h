@@ -1,12 +1,12 @@
 #ifndef GPU_INTERFACE_H
 #define GPU_INTERFACE_H
 
-#include <d3d12.h>
+#include <d3d12Mod.h>
 #include <d3dcompiler.h>
 
 
 struct gpu_device_info {
-        ID3D12Debug *debug;
+        //ID3D12Debug *debug;
         ID3D12Device *device;
 };
 
@@ -22,6 +22,7 @@ struct gpu_cmd_queue_info {
 void create_cmd_queue(struct gpu_device_info *device_info,
                      struct gpu_cmd_queue_info *cmd_queue_info);
 void release_cmd_queue(struct gpu_cmd_queue_info *cmd_queue_info);
+
 
 struct gpu_resource_info {
         D3D12_HEAP_TYPE type;
@@ -44,6 +45,7 @@ void release_resource(struct gpu_resource_info *resource_info);
 void upload_resources(struct gpu_resource_info *resource_info, 
                      void *src_data);
 
+
 struct gpu_descriptor_info {
         D3D12_DESCRIPTOR_HEAP_TYPE type;
         UINT num_descriptors;
@@ -64,6 +66,7 @@ void create_rendertarget_view(struct gpu_device_info *device_info,
 void create_depthstencil_view(struct gpu_device_info *device_info,
                              struct gpu_descriptor_info *descriptor_info,
                              struct gpu_resource_info *resource_info);
+
 
 struct gpu_cmd_allocator_info {
         D3D12_COMMAND_LIST_TYPE cmd_list_type;
