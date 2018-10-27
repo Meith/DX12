@@ -124,8 +124,7 @@ void release_resource(struct gpu_resource_info *resource_info)
         resource_info->resource->lpVtbl->Release(resource_info->resource);
 }
 
-void upload_resources(struct gpu_resource_info *resource_info, 
-                     void *src_data)
+void upload_resources(struct gpu_resource_info *resource_info, void *src_data)
 {
         void *dst_data;
 
@@ -149,7 +148,7 @@ void create_descriptor(struct gpu_device_info *device_info,
         D3D12_DESCRIPTOR_HEAP_DESC heap_desc;
         heap_desc.Type = descriptor_info->type;
         heap_desc.NumDescriptors = descriptor_info->num_descriptors;
-        heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        heap_desc.Flags = descriptor_info->flags;
         heap_desc.NodeMask = 0;
 
         HRESULT result;
@@ -167,6 +166,9 @@ void create_descriptor(struct gpu_device_info *device_info,
                 descriptor_info->descriptor_heap, &descriptor_info->base_cpu_handle);
 
         descriptor_info->cpu_handle = descriptor_info->base_cpu_handle;
+        
+        descriptor_info->descriptor_heap->lpVtbl->GetGPUDescriptorHandleForHeapStart(
+                descriptor_info->descriptor_heap, &descriptor_info->gpu_handle);
 }
 
 void release_descriptor(struct gpu_descriptor_info *descriptor_info)
@@ -216,6 +218,18 @@ void create_depthstencil_view(struct gpu_device_info *device_info,
         device_info->device->lpVtbl->CreateDepthStencilView(
                 device_info->device, resource_info->resource,
                 &dsv_desc, descriptor_info->cpu_handle);
+}
+
+void create_constant_buffer_view(struct gpu_device_info *device_info,
+                                struct gpu_descriptor_info *descriptor_info,
+                                struct gpu_resource_info *resource_info)
+{
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc;
+        cbv_desc.BufferLocation = resource_info->gpu_address;
+        cbv_desc.SizeInBytes = (UINT) resource_info->width;
+
+        device_info->device->lpVtbl->CreateConstantBufferView(
+                device_info->device, &cbv_desc, descriptor_info->cpu_handle);
 }
 
 
@@ -309,120 +323,126 @@ void reset_cmd_list(struct gpu_cmd_allocator_info *cmd_allocator_info,
                 cmd_allocator_info->cmd_allocators[index], NULL);
 }
 
-void record_copy_buffer_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                  struct gpu_resource_info *dst_resource_info, 
-                                  struct gpu_resource_info *src_resource_info)
+void rec_copy_buffer_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                               struct gpu_resource_info *dst_resource_info, 
+                               struct gpu_resource_info *src_resource_info)
 {
-        cmd_list_info->cmd_list->lpVtbl->CopyBufferRegion(cmd_list_info->cmd_list, 
-                dst_resource_info->resource, 0, 
-                src_resource_info->resource, 0, 
-                src_resource_info->width);
+        cmd_list_info->cmd_list->lpVtbl->CopyBufferRegion(
+                cmd_list_info->cmd_list, dst_resource_info->resource, 0, 
+                src_resource_info->resource, 0, src_resource_info->width);
 }
 
-void record_clear_rtv_cmd(struct gpu_cmd_list_info *cmd_list_info, 
-                         struct gpu_descriptor_info *rtv_desc_info, 
-                         float *clear_colour)
+void rec_clear_rtv_cmd(struct gpu_cmd_list_info *cmd_list_info, 
+                      struct gpu_descriptor_info *rtv_desc_info, 
+                      float *clear_colour)
 {
-        cmd_list_info->cmd_list->lpVtbl->ClearRenderTargetView(cmd_list_info->cmd_list, 
-                rtv_desc_info->cpu_handle, clear_colour, 0, NULL);
+        cmd_list_info->cmd_list->lpVtbl->ClearRenderTargetView(
+                cmd_list_info->cmd_list, rtv_desc_info->cpu_handle, 
+                clear_colour, 0, NULL);
 }
 
-void record_clear_dsv_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                         struct gpu_descriptor_info *dsv_desc_info)
+void rec_clear_dsv_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                      struct gpu_descriptor_info *dsv_desc_info)
 {
         cmd_list_info->cmd_list->lpVtbl->ClearDepthStencilView(
                 cmd_list_info->cmd_list, dsv_desc_info->cpu_handle, 
                 D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
 }
 
-void record_set_pipeline_state_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                  struct gpu_pso_info *pso_info)
+void rec_set_pipeline_state_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                               struct gpu_pso_info *pso_info)
 {
         cmd_list_info->cmd_list->lpVtbl->SetPipelineState(
                 cmd_list_info->cmd_list, pso_info->graphics_pso);
 }
 
-void record_set_render_target_cmd(struct gpu_cmd_list_info *cmd_list_info, 
-                                 struct gpu_descriptor_info *rtv_desc_info,
-                                 struct gpu_descriptor_info *dsv_desc_info)
+void rec_set_render_target_cmd(struct gpu_cmd_list_info *cmd_list_info, 
+                              struct gpu_descriptor_info *rtv_desc_info,
+                              struct gpu_descriptor_info *dsv_desc_info)
 {
         cmd_list_info->cmd_list->lpVtbl->OMSetRenderTargets(
                 cmd_list_info->cmd_list, 1, &rtv_desc_info->cpu_handle, TRUE,
                 &dsv_desc_info->cpu_handle);
 }
 
-void record_set_viewport_cmd(struct gpu_cmd_list_info *cmd_list_info, 
-                            struct gpu_viewport_info *viewport_info)
+void rec_set_viewport_cmd(struct gpu_cmd_list_info *cmd_list_info, 
+                         struct gpu_viewport_info *viewport_info)
 {
         cmd_list_info->cmd_list->lpVtbl->RSSetViewports(
                 cmd_list_info->cmd_list, 1, &viewport_info->viewport);
 }
 
-void record_set_scissor_rect_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                struct gpu_scissor_rect_info *scissor_rect_info)
+void rec_set_scissor_rect_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                             struct gpu_scissor_rect_info *scissor_rect_info)
 {
         cmd_list_info->cmd_list->lpVtbl->RSSetScissorRects(
                 cmd_list_info->cmd_list, 1, &scissor_rect_info->scissor_rect);
 }
 
-void record_set_primitive_cmd(struct gpu_cmd_list_info *cmd_list_info)
+void rec_set_primitive_cmd(struct gpu_cmd_list_info *cmd_list_info)
 {
-        cmd_list_info->cmd_list->lpVtbl->IASetPrimitiveTopology(cmd_list_info->cmd_list, 
-                D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        cmd_list_info->cmd_list->lpVtbl->IASetPrimitiveTopology(
+                cmd_list_info->cmd_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-void record_set_graphics_root_sig_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                     struct gpu_root_sig_info *root_sig_info)
+void rec_set_graphics_root_sig_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                                  struct gpu_root_sig_info *root_sig_info)
 {
-        cmd_list_info->cmd_list->lpVtbl->SetGraphicsRootSignature(cmd_list_info->cmd_list, 
-                root_sig_info->root_sig);
+        cmd_list_info->cmd_list->lpVtbl->SetGraphicsRootSignature(
+                cmd_list_info->cmd_list, root_sig_info->root_sig);
 }
 
-void record_set_root_constansts_cmd(struct gpu_cmd_list_info *cmd_list_info, 
-                                   UINT slot_index,
-                                   struct gpu_root_sig_info *root_sig_info,
-                                   const void *data)
+void rec_set_descriptor_heap_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                                struct gpu_descriptor_info *descriptor_info)
 {
-        cmd_list_info->cmd_list->lpVtbl->SetGraphicsRoot32BitConstants(cmd_list_info->cmd_list,
-                slot_index, 
-                root_sig_info->num_32bit_vals_per_const[slot_index], data, 0);
+        cmd_list_info->cmd_list->lpVtbl->SetDescriptorHeaps(
+                cmd_list_info->cmd_list, 1, &descriptor_info->descriptor_heap);
 }
 
-void record_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                 struct gpu_resource_info *vert_buffer_info,
-                                 UINT stride)
+void rec_set_graphics_root_descriptor_table_cmd(
+        struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
+        struct gpu_descriptor_info *descriptor_info)
+{
+    cmd_list_info->cmd_list->lpVtbl->SetGraphicsRootDescriptorTable(
+            cmd_list_info->cmd_list, root_param_index, 
+            descriptor_info->gpu_handle);
+}
+
+void rec_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                              struct gpu_resource_info *vert_buffer_info,
+                              UINT stride)
 {
         D3D12_VERTEX_BUFFER_VIEW vert_buffer_view;
         vert_buffer_view.BufferLocation = vert_buffer_info->gpu_address;
         vert_buffer_view.SizeInBytes = (UINT) vert_buffer_info->width;
         vert_buffer_view.StrideInBytes = stride;
 
-        cmd_list_info->cmd_list->lpVtbl->IASetVertexBuffers(cmd_list_info->cmd_list, 0, 1,
-                &vert_buffer_view);
+        cmd_list_info->cmd_list->lpVtbl->IASetVertexBuffers(
+                cmd_list_info->cmd_list, 0, 1, &vert_buffer_view);
 }
 
-void record_set_index_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                struct gpu_resource_info *index_buffer)
+void rec_set_index_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                             struct gpu_resource_info *index_buffer)
 {
         D3D12_INDEX_BUFFER_VIEW index_buffer_view;
         index_buffer_view.BufferLocation = index_buffer->gpu_address;
         index_buffer_view.SizeInBytes = (UINT) index_buffer->width;
         index_buffer_view.Format = DXGI_FORMAT_R32_UINT;
 
-        cmd_list_info->cmd_list->lpVtbl->IASetIndexBuffer(cmd_list_info->cmd_list, 
-                &index_buffer_view);
+        cmd_list_info->cmd_list->lpVtbl->IASetIndexBuffer(
+                cmd_list_info->cmd_list, &index_buffer_view);
 }
 
-void record_draw_indexed_instance_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                     UINT index_count, UINT instance_count)
+void rec_draw_indexed_instance_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                                  UINT index_count, UINT instance_count)
 {
-        cmd_list_info->cmd_list->lpVtbl->DrawIndexedInstanced(cmd_list_info->cmd_list, 
-                index_count, instance_count, 0, 0, 0);
+        cmd_list_info->cmd_list->lpVtbl->DrawIndexedInstanced(
+                cmd_list_info->cmd_list, index_count, instance_count, 0, 0, 0);
 }
 
 void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
-                         struct gpu_resource_info *resource_info, 
-                         D3D12_RESOURCE_STATES resource_end_state)
+                        struct gpu_resource_info *resource_info, 
+                        D3D12_RESOURCE_STATES resource_end_state)
 {
         D3D12_RESOURCE_BARRIER resource_barrier;
         resource_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -433,15 +453,15 @@ void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
         resource_barrier.Transition.StateBefore = resource_info->current_state;
         resource_barrier.Transition.StateAfter = resource_end_state;
 
-        cmd_list_info->cmd_list->lpVtbl->ResourceBarrier(cmd_list_info->cmd_list, 1, 
-                &resource_barrier);
+        cmd_list_info->cmd_list->lpVtbl->ResourceBarrier(
+                cmd_list_info->cmd_list, 1, &resource_barrier);
 
         resource_info->current_state = resource_end_state;
 }
 
 
 void create_fence(struct gpu_device_info *device_info, 
-        struct gpu_fence_info *fence_info)
+                 struct gpu_fence_info *fence_info)
 {
         fence_info->fence_values = malloc(fence_info->num_fence_value * 
                 sizeof (UINT64));
@@ -532,16 +552,17 @@ void release_shader(struct gpu_shader_info *shader_info)
 }
 
 
-void setup_vertex_input(struct gpu_vert_input_info *input_info)
+void setup_vertex_input(LPCSTR *attribute_names, DXGI_FORMAT *attribute_formats, 
+                       struct gpu_vert_input_info *input_info)
 {
         input_info->input_element_descs = malloc(input_info->attribute_count *
                 sizeof (D3D12_INPUT_ELEMENT_DESC));
         for (UINT i = 0; i < input_info->attribute_count; ++i) {
                 input_info->input_element_descs[i].SemanticName = 
-                        input_info->semantic_names[i];
+                        attribute_names[i];
                 input_info->input_element_descs[i].SemanticIndex = 0;
                 input_info->input_element_descs[i].Format = 
-                        input_info->formats[i];
+                        attribute_formats[i];
                 input_info->input_element_descs[i].InputSlot = 0;
                 input_info->input_element_descs[i].AlignedByteOffset = 
                         D3D12_APPEND_ALIGNED_ELEMENT;
@@ -553,39 +574,49 @@ void setup_vertex_input(struct gpu_vert_input_info *input_info)
 
 void free_vertex_input(struct gpu_vert_input_info *input_info)
 {
-        free(input_info->semantic_names);
-        free(input_info->formats);
         free(input_info->input_element_descs);
 }
 
 
 void create_root_sig(struct gpu_device_info *device_info,
+                    struct gpu_root_param_info *root_param_infos,
+                    UINT num_root_params,
                     struct gpu_root_sig_info *root_sig_info)
 {
-        root_sig_info->root_params = malloc(root_sig_info->num_root_params *
+        D3D12_DESCRIPTOR_RANGE *descriptor_ranges = malloc(num_root_params * 
+                sizeof (D3D12_DESCRIPTOR_RANGE));
+
+        D3D12_ROOT_PARAMETER *root_params = malloc(num_root_params *
                 sizeof (D3D12_ROOT_PARAMETER));
-        for (UINT i = 0; i < root_sig_info->num_root_params; ++i) {
-                root_sig_info->root_params[i].ParameterType = 
-                        root_sig_info->root_param_types[i];
-                root_sig_info->root_params[i].Constants.ShaderRegister = 0;
-                root_sig_info->root_params[i].Constants.RegisterSpace = 0;
-                root_sig_info->root_params[i].Constants.Num32BitValues = 
-                        root_sig_info->num_32bit_vals_per_const[i];
-                root_sig_info->root_params[i].ShaderVisibility = 
-                        D3D12_SHADER_VISIBILITY_VERTEX;
+
+        for (UINT i = 0; i < num_root_params; ++i) {
+                descriptor_ranges[i].RangeType = 
+                        root_param_infos[i].range_type;
+                descriptor_ranges[i].NumDescriptors = 
+                        root_param_infos[i].num_descriptors;
+                descriptor_ranges[i].BaseShaderRegister = 0;
+                descriptor_ranges[i].RegisterSpace = 0;
+                descriptor_ranges[i].OffsetInDescriptorsFromTableStart = 0;
+
+                root_params[i].ParameterType = 
+                        D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                root_params[i].DescriptorTable.NumDescriptorRanges = 1;
+                root_params[i].DescriptorTable.pDescriptorRanges = 
+                        &descriptor_ranges[i];
+                root_params[i].ShaderVisibility = 
+                        root_param_infos[i].shader_visbility;
         }
 
         D3D12_ROOT_SIGNATURE_FLAGS root_sig_flags = 
                 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
                 D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
                 D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+                D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC root_sig_desc;
         root_sig_desc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
-        root_sig_desc.Desc_1_0.NumParameters = root_sig_info->num_root_params;
-        root_sig_desc.Desc_1_0.pParameters = root_sig_info->root_params;
+        root_sig_desc.Desc_1_0.NumParameters = num_root_params;
+        root_sig_desc.Desc_1_0.pParameters = root_params;
         root_sig_desc.Desc_1_0.NumStaticSamplers = 0;
         root_sig_desc.Desc_1_0.pStaticSamplers = NULL;
         root_sig_desc.Desc_1_0.Flags = root_sig_flags;
@@ -599,9 +630,19 @@ void create_root_sig(struct gpu_device_info *device_info,
         show_error_if_failed(result);
         assert(root_sig_error_blob == NULL);
 
-        result = device_info->device->lpVtbl->CreateRootSignature(device_info->device, 0, 
-                root_sig_info->root_sig_blob->lpVtbl->GetBufferPointer(root_sig_info->root_sig_blob), 
-                root_sig_info->root_sig_blob->lpVtbl->GetBufferSize(root_sig_info->root_sig_blob), 
+        free(root_params);
+        free(descriptor_ranges);
+
+        void *root_sig_blob_ptr = 
+                root_sig_info->root_sig_blob->lpVtbl->GetBufferPointer(
+                        root_sig_info->root_sig_blob);
+
+        size_t root_sig_blob_len = 
+                root_sig_info->root_sig_blob->lpVtbl->GetBufferSize(
+                        root_sig_info->root_sig_blob);
+
+        result = device_info->device->lpVtbl->CreateRootSignature(
+                device_info->device, 0, root_sig_blob_ptr, root_sig_blob_len, 
                 &IID_ID3D12RootSignature, &root_sig_info->root_sig);
         show_error_if_failed(result);
 }
@@ -609,16 +650,15 @@ void create_root_sig(struct gpu_device_info *device_info,
 void release_root_sig(struct gpu_root_sig_info *root_sig_info)
 {
         root_sig_info->root_sig->lpVtbl->Release(root_sig_info->root_sig);
-        root_sig_info->root_sig_blob->lpVtbl->Release(root_sig_info->root_sig_blob);
-        free(root_sig_info->num_32bit_vals_per_const);
-        free(root_sig_info->root_params);
+        root_sig_info->root_sig_blob->lpVtbl->Release(
+                root_sig_info->root_sig_blob);
 }
 
 
-void create_pso(struct gpu_device_info *device_info, 
-               struct gpu_vert_input_info *vert_input_info, 
-               struct gpu_root_sig_info *root_sig_info,
-               struct gpu_pso_info *pso_info)
+void create_graphics_pso(struct gpu_device_info *device_info,
+                        struct gpu_vert_input_info *vert_input_info, 
+                        struct gpu_root_sig_info *root_sig_info,
+                        struct gpu_pso_info *pso_info)
 {
         D3D12_GRAPHICS_PIPELINE_STATE_DESC graphics_pso_desc;
         graphics_pso_desc.pRootSignature = root_sig_info->root_sig;
@@ -729,6 +769,18 @@ void create_pso(struct gpu_device_info *device_info,
                 &pso_info->graphics_pso);
         
         show_error_if_failed(result);
+}
+
+void create_compute_pso(struct gpu_device_info *gdi, 
+                       struct gpu_root_sig_info *root_sig_info,
+                       struct gpu_pso_info *pso_info)
+{
+        D3D12_COMPUTE_PIPELINE_STATE_DESC compute_pso_desc;
+        compute_pso_desc.pRootSignature;
+        compute_pso_desc.CS;
+        compute_pso_desc.NodeMask;
+        compute_pso_desc.CachedPSO;
+        compute_pso_desc.Flags;
 }
 
 void release_pso(struct gpu_pso_info *pso_info)

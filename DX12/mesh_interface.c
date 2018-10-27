@@ -7,8 +7,7 @@ void create_triangle(struct mesh_info *mi)
 {
         mi->vertex_count = 3;
 
-        mi->verticies = malloc(mi->vertex_count * 
-                        sizeof (struct vertex));
+        mi->verticies = malloc(mi->vertex_count * sizeof (struct vertex));
 
         // Bottom left vertex
         mi->verticies[0].position[0] = -1.0f;

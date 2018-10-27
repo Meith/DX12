@@ -134,6 +134,7 @@
     <ClInclude Include="gpu_interface.h" />
     <ClInclude Include="linmath.h" />
     <ClInclude Include="mesh_interface.h" />
+    <ClInclude Include="misc.h" />
     <ClInclude Include="swapchain_inerface.h" />
     <ClInclude Include="window_interface.h" />
   </ItemGroup>
