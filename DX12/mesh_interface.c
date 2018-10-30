@@ -18,9 +18,11 @@ void create_triangle(struct mesh_info *mi)
         mi->verticies[0].colour[1] = 0.0f;
         mi->verticies[0].colour[2] = 0.0f;
         mi->verticies[0].colour[3] = 1.0f;
+        mi->verticies[0].uv[0] = 0.0f;
+        mi->verticies[0].uv[1] = 0.0f;
 
         // Top vertex
-        mi->verticies[1].position[0] = 0.0f;
+        mi->verticies[1].position[0] = -1.0f;
         mi->verticies[1].position[1] = 1.0f;
         mi->verticies[1].position[2] = 0.0f;
         mi->verticies[1].position[3] = 1.0f;
@@ -28,6 +30,8 @@ void create_triangle(struct mesh_info *mi)
         mi->verticies[1].colour[1] = 1.0f;
         mi->verticies[1].colour[2] = 0.0f;
         mi->verticies[1].colour[3] = 1.0f;
+        mi->verticies[1].uv[0] = 0.0f;
+        mi->verticies[1].uv[1] = 1.0f;
 
         // Bottom right vertex
         mi->verticies[2].position[0] = 1.0f;
@@ -38,6 +42,8 @@ void create_triangle(struct mesh_info *mi)
         mi->verticies[2].colour[1] = 0.0f;
         mi->verticies[2].colour[2] = 1.0f;
         mi->verticies[2].colour[3] = 1.0f;
+        mi->verticies[2].uv[0] = 1.0f;
+        mi->verticies[2].uv[1] = 0.0f;
 
         mi->index_count = 3;
         mi->indices = malloc(mi->index_count * sizeof(unsigned int));

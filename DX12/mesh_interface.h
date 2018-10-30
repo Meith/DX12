@@ -7,6 +7,7 @@
 struct vertex {
         vec4 position;
         vec4 colour;
+        vec2 uv;
 };
 
 struct mesh_info {

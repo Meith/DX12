@@ -34,7 +34,6 @@ struct gpu_resource_info {
         DXGI_FORMAT format;
         D3D12_TEXTURE_LAYOUT layout;
         D3D12_RESOURCE_FLAGS flags;
-        D3D12_CLEAR_VALUE clear_value;
         D3D12_RESOURCE_STATES current_state;
         ID3D12Resource *resource;
         D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
@@ -71,6 +70,12 @@ void create_depthstencil_view(struct gpu_device_info *device_info,
 void create_constant_buffer_view(struct gpu_device_info *device_info,
                                 struct gpu_descriptor_info *descriptor_info,
                                 struct gpu_resource_info *resource_info);
+void create_shader_resource_view(struct gpu_device_info *device_info,
+                                struct gpu_descriptor_info *descriptor_info,
+                                struct gpu_resource_info *resource_info);
+void create_sampler(struct gpu_device_info *device_info,
+                   struct gpu_descriptor_info *descriptor_info);
+
 
 
 struct gpu_cmd_allocator_info {
@@ -104,6 +109,9 @@ void reset_cmd_list(struct gpu_cmd_allocator_info *cmd_allocator_info,
 void rec_copy_buffer_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
                                struct gpu_resource_info *dst_resource_info, 
                                struct gpu_resource_info *src_resource_info);
+void rec_copy_texture_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                                struct gpu_resource_info *dst_resource_info,
+                                struct gpu_resource_info *src_resource_info);
 void rec_clear_rtv_cmd(struct gpu_cmd_list_info *cmd_list_info,
                       struct gpu_descriptor_info *rtv_desc_info, 
                       float *clear_colour);
@@ -235,4 +243,6 @@ struct gpu_scissor_rect_info {
 };
 
 void create_scissor_rect(struct gpu_scissor_rect_info *scissor_rect_info);
+
+
 #endif

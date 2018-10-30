@@ -3,6 +3,7 @@
 #include "swapchain_inerface.h"
 #include "mesh_interface.h"
 #include "camera_interface.h"
+#include "material_interface.h"
 #include "error.h"
 #include "misc.h"
 
@@ -31,7 +32,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
         // Create compute queue
         struct gpu_cmd_queue_info compute_queue_info;
-        compute_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        compute_queue_info.type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
         create_cmd_queue(&device_info, &compute_queue_info);
 
         // Create copy queue
@@ -227,27 +228,22 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Compile vertex shader
         struct gpu_shader_info vert_shader_info;
         vert_shader_info.shader_file = L"shaders\\tri_vert_shader.hlsl";
-        vert_shader_info.flags = D3DCOMPILE_DEBUG | 
-                                 D3DCOMPILE_SKIP_OPTIMIZATION | 
-                                 D3DCOMPILE_WARNINGS_ARE_ERRORS;
         vert_shader_info.shader_target = "vs_5_1";
         compile_shader(&vert_shader_info);
 
         // Compile pixel shader
         struct gpu_shader_info pix_shader_info;
         pix_shader_info.shader_file = L"shaders\\tri_pix_shader.hlsl";
-        pix_shader_info.flags = D3DCOMPILE_DEBUG | 
-                                D3DCOMPILE_SKIP_OPTIMIZATION | 
-                                D3DCOMPILE_WARNINGS_ARE_ERRORS;
         pix_shader_info.shader_target = "ps_5_1";
         compile_shader(&pix_shader_info);
 
         // Setup vertex input layout
-        #define ATTRIBUTE_COUNT 2
-        LPCSTR attribute_names[ATTRIBUTE_COUNT] = { "POSITION", "COLOR" };
+        #define ATTRIBUTE_COUNT 3
+        LPCSTR attribute_names[ATTRIBUTE_COUNT] = { "POSITION", "COLOR", "TEXCOORD" };
         DXGI_FORMAT attribute_formats[ATTRIBUTE_COUNT] = { 
                 DXGI_FORMAT_R32G32B32A32_FLOAT,
-                DXGI_FORMAT_R32G32B32A32_FLOAT 
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                DXGI_FORMAT_R32G32_FLOAT
         };
         struct gpu_vert_input_info vert_input_info;
         vert_input_info.attribute_count = ATTRIBUTE_COUNT;
@@ -255,14 +251,14 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 &vert_input_info);
 
         // Create root signature
-        #define ROOT_PARAM_COUNT 1
+        #define ROOT_PARAM_COUNT 3
         struct gpu_root_param_info root_param_infos[ROOT_PARAM_COUNT];
 
         root_param_infos[0].range_type = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         root_param_infos[0].num_descriptors = 1;
         root_param_infos[0].shader_visbility = D3D12_SHADER_VISIBILITY_VERTEX;
        
-       /* root_param_infos[1].range_type = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        root_param_infos[1].range_type = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         root_param_infos[1].num_descriptors = 1;
         root_param_infos[1].shader_visbility = D3D12_SHADER_VISIBILITY_PIXEL;
 
@@ -270,10 +266,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         root_param_infos[2].num_descriptors = 1;
         root_param_infos[2].shader_visbility =
-                D3D12_SHADER_VISIBILITY_PIXEL;*/
+                D3D12_SHADER_VISIBILITY_PIXEL;
 
         struct gpu_root_sig_info root_sig_info;
-        create_root_sig(&device_info, root_param_infos, ROOT_PARAM_COUNT, 
+        create_root_sig(&device_info, root_param_infos, ROOT_PARAM_COUNT,
                 &root_sig_info);
 
         // Create pipeline state object
@@ -307,7 +303,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_scissor_rect_info scissor_rect_info;
         create_scissor_rect(&scissor_rect_info);
 
-        // Calc project view matrix
+        // Calculate project view matrix
         struct camera_info cam_info;
         calc_proj_view_mat(&cam_info);
 
@@ -323,7 +319,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_resource_info cbv_resource_info;
         cbv_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
         cbv_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        cbv_resource_info.width = align_offset(sizeof (cam_info.pv_mat), 256);                ~(256 - 1);
+        cbv_resource_info.width = align_offset(sizeof (cam_info.pv_mat), 256);
         cbv_resource_info.height = 1;
         cbv_resource_info.mip_levels = 1;
         cbv_resource_info.format = DXGI_FORMAT_UNKNOWN;
@@ -338,6 +334,84 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Create constant buffer view
         create_constant_buffer_view(&device_info, &cbv_descriptor_info, 
                 &cbv_resource_info);
+
+        // Create shader resource descriptor
+        struct gpu_descriptor_info srv_descriptor_info;
+        srv_descriptor_info.type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        srv_descriptor_info.num_descriptors = 
+                root_param_infos[1].num_descriptors;
+        srv_descriptor_info.flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        create_descriptor(&device_info, &srv_descriptor_info);
+
+        // Create texture resource
+        struct gpu_resource_info tex_resource_info;
+        tex_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
+        tex_resource_info.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        tex_resource_info.width = 256;
+        tex_resource_info.height = 256;
+        tex_resource_info.mip_levels = 1;
+        tex_resource_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        tex_resource_info.layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        tex_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
+        tex_resource_info.current_state = D3D12_RESOURCE_STATE_COPY_DEST;
+        create_resource(&device_info, &tex_resource_info);
+
+        // Get checker board texture material
+        struct material_info checkerboard_mat_info;
+        get_checkerboard_tex(tex_resource_info.width, tex_resource_info.height, 
+                &checkerboard_mat_info);
+
+        // Create texture upload resource
+        struct gpu_resource_info tex_upload_resource_info;
+        tex_upload_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
+        tex_upload_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        tex_upload_resource_info.width = checkerboard_mat_info.tex_size;
+        tex_upload_resource_info.height = 1;
+        tex_upload_resource_info.mip_levels = 1;
+        tex_upload_resource_info.format = DXGI_FORMAT_UNKNOWN;
+        tex_upload_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        tex_upload_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
+        tex_upload_resource_info.current_state = 
+                D3D12_RESOURCE_STATE_GENERIC_READ;
+        create_resource(&device_info, &tex_upload_resource_info);
+
+        // Upload texture resource
+        upload_resources(&tex_upload_resource_info, checkerboard_mat_info.tex);
+
+        reset_cmd_allocators(&copy_cmd_allocator_info);
+
+        reset_cmd_list(&copy_cmd_allocator_info, &copy_cmd_list_info, 0);
+
+        rec_copy_texture_region_cmd(&copy_cmd_list_info, &tex_resource_info,
+                &tex_upload_resource_info);
+
+        // Close command list for execution
+        close_cmd_list(&copy_cmd_list_info);
+
+        // Exexute command list
+        execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
+
+        signal_gpu(&copy_queue_info, &copy_fence_info, 0);
+
+        wait_for_gpu(&copy_fence_info, 0);
+
+        // Transition gpu shader resource from copy to vertex buffer
+        transition_resource(&render_cmd_list_info, &tex_resource_info,
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+        // Create shader resource view
+        create_shader_resource_view(&device_info, &srv_descriptor_info, &tex_resource_info);
+
+        // Create sampler descriptor
+        struct gpu_descriptor_info sampler_descriptor_info;
+        sampler_descriptor_info.type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+        sampler_descriptor_info.num_descriptors = 
+                root_param_infos[2].num_descriptors;
+        sampler_descriptor_info.flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        create_descriptor(&device_info, &sampler_descriptor_info);
+
+        // Create sampler
+        create_sampler(&device_info, &sampler_descriptor_info);
 
         // Get current back buffer index
         UINT back_buffer_index = get_backbuffer_index(&swp_chain_info);
@@ -393,6 +467,26 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 rec_set_graphics_root_descriptor_table_cmd(
                         &render_cmd_list_info, 0, 
                         &cbv_descriptor_info);
+
+                // Set descriptor heap for shader resource
+                rec_set_descriptor_heap_cmd(&render_cmd_list_info,
+                        &srv_descriptor_info);
+
+                // Set shader resource table
+                rec_set_graphics_root_descriptor_table_cmd(
+                        &render_cmd_list_info, 1,
+                        &srv_descriptor_info
+                );
+
+                // Set descriptor heap for sampler
+                rec_set_descriptor_heap_cmd(&render_cmd_list_info,
+                        &sampler_descriptor_info);
+
+                // Set sampler table
+                rec_set_graphics_root_descriptor_table_cmd(
+                    &render_cmd_list_info, 2,
+                    &sampler_descriptor_info
+                );
 
                 // Set vertex buffer
                 rec_set_vertex_buffer_cmd(&render_cmd_list_info,

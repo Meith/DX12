@@ -125,14 +125,17 @@
     <ClCompile Include="error.c" />
     <ClCompile Include="gpu_interface.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="material_interface.c" />
     <ClCompile Include="mesh_interface.c" />
     <ClCompile Include="swapchain_interface.c" />
     <ClCompile Include="window_interface.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera_interface.h" />
     <ClInclude Include="error.h" />
     <ClInclude Include="gpu_interface.h" />
     <ClInclude Include="linmath.h" />
+    <ClInclude Include="material_interface.h" />
     <ClInclude Include="mesh_interface.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="swapchain_inerface.h" />

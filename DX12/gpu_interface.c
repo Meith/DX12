@@ -1,5 +1,6 @@
 #include "gpu_interface.h"
 #include "error.h"
+#include "misc.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -82,27 +83,29 @@ void create_resource(struct gpu_device_info *device_info,
         resource_desc.SampleDesc.Quality = 0;
         resource_desc.Layout = resource_info->layout;
         resource_desc.Flags = resource_info->flags;
-
+        
         D3D12_CLEAR_VALUE *clear_value_ptr = NULL;
+        D3D12_CLEAR_VALUE clear_value;
+        clear_value.Format = resource_info->format;
+        switch (resource_info->flags)
+        {
+                case D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL:
+                        clear_value.DepthStencil.Depth = 1.0f;
+                        clear_value.DepthStencil.Stencil = 0;
+                        clear_value_ptr = &clear_value;
+                        break;
 
-        resource_info->clear_value.Format = 
-                resource_info->format;
+                case D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET:
+                        clear_value.Color[0] = 0.0f;
+                        clear_value.Color[1] = 0.0f;
+                        clear_value.Color[2] = 0.0f;
+                        clear_value.Color[3] = 1.0f;
+                        clear_value_ptr = &clear_value;
+                        break;
 
-        if (resource_info->flags ==
-                D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) {
-                resource_info->clear_value.DepthStencil.Depth = 1.0f;
-                resource_info->clear_value.DepthStencil.Stencil = 0;
-        } else {
-                resource_info->clear_value.Color[0] = 0.0f;
-                resource_info->clear_value.Color[1] = 0.0f;
-                resource_info->clear_value.Color[2] = 0.0f;
-                resource_info->clear_value.Color[3] = 1.0f;
+                default:
+                     break;
         }
-
-        if (resource_info->dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
-            resource_info->dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
-            resource_info->dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
-                      clear_value_ptr = &resource_info->clear_value;
 
         HRESULT result;
 
@@ -232,6 +235,60 @@ void create_constant_buffer_view(struct gpu_device_info *device_info,
                 device_info->device, &cbv_desc, descriptor_info->cpu_handle);
 }
 
+void create_shader_resource_view(struct gpu_device_info *device_info,
+                                struct gpu_descriptor_info *descriptor_info,
+                                struct gpu_resource_info *resource_info)
+{
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
+        srv_desc.Format = resource_info->format;
+        srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+        switch (srv_desc.ViewDimension)
+        {
+                case D3D12_SRV_DIMENSION_TEXTURE2D:
+                        srv_desc.Texture2D.MostDetailedMip = 0;
+                        srv_desc.Texture2D.MipLevels = 1;
+                        srv_desc.Texture2D.PlaneSlice = 0;
+                        srv_desc.Texture2D.ResourceMinLODClamp = 0.0f;
+                        break;
+
+                default:
+                        break;
+        }
+
+        device_info->device->lpVtbl->CreateShaderResourceView(
+                device_info->device, resource_info->resource, &srv_desc, 
+                descriptor_info->cpu_handle);
+}
+
+void create_sampler(struct gpu_device_info *device_info,
+                   struct gpu_descriptor_info *descriptor_info)
+{
+        D3D12_SAMPLER_DESC sampler_desc;
+        sampler_desc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler_desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler_desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler_desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler_desc.MipLODBias = 0;
+        sampler_desc.MaxAnisotropy = 0;
+        sampler_desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler_desc.BorderColor[0] = 
+                D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler_desc.BorderColor[1] = 
+                D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler_desc.BorderColor[2] = 
+                D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler_desc.BorderColor[3] = 
+                D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler_desc.MinLOD = 0.0f;
+        sampler_desc.MaxLOD = D3D12_FLOAT32_MAX;
+
+        device_info->device->lpVtbl->CreateSampler(
+                device_info->device, &sampler_desc, descriptor_info->cpu_handle
+        );
+}
+
 
 void create_cmd_allocators(struct gpu_device_info *device_info,
                           struct gpu_cmd_allocator_info *cmd_allocator_info)
@@ -330,6 +387,35 @@ void rec_copy_buffer_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
         cmd_list_info->cmd_list->lpVtbl->CopyBufferRegion(
                 cmd_list_info->cmd_list, dst_resource_info->resource, 0, 
                 src_resource_info->resource, 0, src_resource_info->width);
+}
+
+void rec_copy_texture_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                                struct gpu_resource_info *dst_resource_info,
+                                struct gpu_resource_info *src_resource_info)
+{
+        D3D12_TEXTURE_COPY_LOCATION dst_tex_loc;
+        dst_tex_loc.pResource = dst_resource_info->resource;
+        dst_tex_loc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dst_tex_loc.SubresourceIndex = 0;
+
+        D3D12_TEXTURE_COPY_LOCATION src_tex_loc;
+        src_tex_loc.pResource = src_resource_info->resource;
+        src_tex_loc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        src_tex_loc.PlacedFootprint.Offset = 0;
+        src_tex_loc.PlacedFootprint.Footprint.Format = 
+                dst_resource_info->format;
+        src_tex_loc.PlacedFootprint.Footprint.Width = 
+                (UINT) dst_resource_info->width;
+        src_tex_loc.PlacedFootprint.Footprint.Height = 
+                (UINT) dst_resource_info->height;
+        src_tex_loc.PlacedFootprint.Footprint.Depth = 1;
+        src_tex_loc.PlacedFootprint.Footprint.RowPitch = 
+                (UINT) align_offset(dst_resource_info->width * sizeof(DWORD),
+                        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+        cmd_list_info->cmd_list->lpVtbl->CopyTextureRegion(
+                cmd_list_info->cmd_list, &dst_tex_loc, 0, 0, 0, &src_tex_loc,
+                NULL);
 }
 
 void rec_clear_rtv_cmd(struct gpu_cmd_list_info *cmd_list_info, 
@@ -524,6 +610,14 @@ void wait_for_gpu(struct gpu_fence_info *fence_info, UINT index)
 
 void compile_shader(struct gpu_shader_info *shader_info)
 {
+        #if defined(_DEBUG)
+        shader_info->flags = D3DCOMPILE_DEBUG | 
+                             D3DCOMPILE_SKIP_OPTIMIZATION | 
+                             D3DCOMPILE_WARNINGS_ARE_ERRORS;
+        #else
+        shader_info->flags = 0;
+        #endif
+
         HRESULT result;
 
         ID3DBlob *shader_error_blob = NULL;
