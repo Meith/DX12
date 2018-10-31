@@ -36,3 +36,8 @@ void get_checkerboard_tex(UINT64 width, UINT64 height, struct material_info *mat
             }
         }
 }
+
+void release_material(struct material_info *mat_info)
+{
+        free(mat_info->tex);
+}

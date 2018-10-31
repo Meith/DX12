@@ -79,5 +79,8 @@
     <FxCompile Include="shaders\tri_vert_shader.hlsl">
       <Filter>Shader Files</Filter>
     </FxCompile>
+    <FxCompile Include="shaders\tri_comp_shader.hlsl">
+      <Filter>Shader Files</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

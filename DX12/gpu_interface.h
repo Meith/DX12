@@ -70,6 +70,9 @@ void create_depthstencil_view(struct gpu_device_info *device_info,
 void create_constant_buffer_view(struct gpu_device_info *device_info,
                                 struct gpu_descriptor_info *descriptor_info,
                                 struct gpu_resource_info *resource_info);
+void create_unorderd_access_view(struct gpu_device_info *device_info,
+                                struct gpu_descriptor_info *descriptor_info,
+                                struct gpu_resource_info *resource_info);
 void create_shader_resource_view(struct gpu_device_info *device_info,
                                 struct gpu_descriptor_info *descriptor_info,
                                 struct gpu_resource_info *resource_info);
@@ -127,6 +130,8 @@ void rec_set_viewport_cmd(struct gpu_cmd_list_info *cmd_list_info,
 void rec_set_scissor_rect_cmd(struct gpu_cmd_list_info *cmd_list_info,
                              struct gpu_scissor_rect_info *scissor_rect_info);
 void rec_set_primitive_cmd(struct gpu_cmd_list_info *cmd_list_info);
+void rec_set_compute_root_sig_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                                 struct gpu_root_sig_info *root_sig_info);
 void rec_set_graphics_root_sig_cmd(struct gpu_cmd_list_info *cmd_list_info,
                                   struct gpu_root_sig_info *root_sig_info);
 void rec_set_descriptor_heap_cmd(struct gpu_cmd_list_info *cmd_list_info,
@@ -139,6 +144,9 @@ void rec_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
                               UINT stride);
 void rec_set_index_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
                              struct gpu_resource_info *index_buffer);
+void rec_dispatch_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                     UINT thread_group_coun_x, UINT thread_group_coun_y,
+                     UINT thread_group_coun_z);
 void rec_draw_indexed_instance_cmd(struct gpu_cmd_list_info *cmd_list_info,
                                   UINT index_count, UINT instance_count);
 void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
@@ -203,7 +211,12 @@ void create_root_sig(struct gpu_device_info *device_info,
 void release_root_sig(struct gpu_root_sig_info *root_sig_info);
 
 
-struct gpu_pso_info {
+enum PSO_TYPE {
+        PSO_TYPE_GRAPHICS,
+        PSO_TYPE_COMPUTE
+};
+
+struct gpu_graphics_pso_info {
         void *vert_shader_byte_code;
         size_t vert_shader_byte_code_len;
         void *pix_shader_byte_code;
@@ -216,16 +229,34 @@ struct gpu_pso_info {
         size_t geom_shader_byte_code_len;
         DXGI_FORMAT render_target_format;
         DXGI_FORMAT depth_target_format;
-        ID3D12PipelineState *graphics_pso;
 };
 
-void create_graphics_pso(struct gpu_device_info *gdi, 
-                        struct gpu_vert_input_info *vert_input_info, 
-                        struct gpu_root_sig_info *root_sig_info,
-                        struct gpu_pso_info *pso_info);
-void create_compute_pso(struct gpu_device_info *gdi, 
-                       struct gpu_root_sig_info *root_sig_info,
-                       struct gpu_pso_info *pso_info);
+struct gpu_compute_pso_info {
+        void *comp_shader_byte_code;
+        size_t comp_shader_byte_code_len;
+        ID3D12PipelineState *compute_pso;
+};
+
+struct gpu_pso_info {
+        enum PSO_TYPE type;
+        union {
+                struct gpu_graphics_pso_info graphics_pso_info;
+                struct gpu_compute_pso_info compute_pso_info;
+        };
+        ID3D12PipelineState *pso;
+};
+
+void create_pso(struct gpu_device_info *device_info,
+               struct gpu_vert_input_info *vert_input_info, 
+               struct gpu_root_sig_info *root_sig_info,
+               struct gpu_pso_info *pso_info);
+static void create_graphics_pso(struct gpu_device_info *device_info,   
+                               struct gpu_vert_input_info *vert_input_info,
+                               struct gpu_root_sig_info *root_sig_info,
+                               struct gpu_pso_info *pso_info);
+static void create_compute_pso(struct gpu_device_info *device_info,
+                              struct gpu_root_sig_info *root_sig_info,
+                              struct gpu_pso_info *pso_info);
 void release_pso(struct gpu_pso_info *pso_info);
 
 

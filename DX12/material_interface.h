@@ -11,5 +11,6 @@ struct material_info {
 };
 
 void get_checkerboard_tex(UINT64 width, UINT64 height, struct material_info *mat_info);
+void release_material(struct material_info *mat_info);
 
 #endif
