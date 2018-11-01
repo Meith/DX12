@@ -53,6 +53,7 @@ struct gpu_descriptor_info {
         UINT stride;
         D3D12_CPU_DESCRIPTOR_HANDLE base_cpu_handle;
         D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
+        D3D12_GPU_DESCRIPTOR_HANDLE base_gpu_handle;
         D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
 };
 
@@ -60,6 +61,8 @@ void create_descriptor(struct gpu_device_info *device_info,
                       struct gpu_descriptor_info *descriptor_info);
 void release_descriptor(struct gpu_descriptor_info *descriptor_info);
 void update_cpu_handle(struct gpu_descriptor_info *descriptor_info, 
+                      UINT index);
+void update_gpu_handle(struct gpu_descriptor_info *descriptor_info, 
                       UINT index);
 void create_rendertarget_view(struct gpu_device_info *device_info,
                              struct gpu_descriptor_info *descriptor_info,
@@ -136,6 +139,9 @@ void rec_set_graphics_root_sig_cmd(struct gpu_cmd_list_info *cmd_list_info,
                                   struct gpu_root_sig_info *root_sig_info);
 void rec_set_descriptor_heap_cmd(struct gpu_cmd_list_info *cmd_list_info,
                                 struct gpu_descriptor_info *descriptor_info);
+void rec_set_compute_root_descriptor_table_cmd(
+        struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
+        struct gpu_descriptor_info *descriptor_info);
 void rec_set_graphics_root_descriptor_table_cmd(
         struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
         struct gpu_descriptor_info *descriptor_info);
@@ -167,6 +173,8 @@ void create_fence(struct gpu_device_info *device_info,
 void release_fence(struct gpu_fence_info *fence_info);
 void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
                struct gpu_fence_info *fence_info, UINT index);
+void wait_for_fence(struct gpu_cmd_queue_info *cmd_queue_info,
+                   struct gpu_fence_info *fence_info);
 void wait_for_gpu(struct gpu_fence_info *fence_info, UINT index);
 
 

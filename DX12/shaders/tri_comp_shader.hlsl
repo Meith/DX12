@@ -9,5 +9,5 @@ RWTexture2D<float4> colour_tex : register(u0);
 void main(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID,
         uint3 GTid : SV_GroupThreadID, uint GI : SV_GroupIndex)
 {
-        colour_tex[DTid.xy] *= sin(time);
+        colour_tex[DTid.xy] *= sin(50.0f);
 }

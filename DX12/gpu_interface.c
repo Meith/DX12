@@ -171,7 +171,9 @@ void create_descriptor(struct gpu_device_info *device_info,
         descriptor_info->cpu_handle = descriptor_info->base_cpu_handle;
         
         descriptor_info->descriptor_heap->lpVtbl->GetGPUDescriptorHandleForHeapStart(
-                descriptor_info->descriptor_heap, &descriptor_info->gpu_handle);
+                descriptor_info->descriptor_heap, &descriptor_info->base_gpu_handle);
+
+        descriptor_info->gpu_handle = descriptor_info->base_gpu_handle;
 }
 
 void release_descriptor(struct gpu_descriptor_info *descriptor_info)
@@ -184,6 +186,13 @@ void update_cpu_handle(struct gpu_descriptor_info *descriptor_info,
                       UINT index)
 {
         descriptor_info->cpu_handle.ptr = descriptor_info->base_cpu_handle.ptr + 
+                index * descriptor_info->stride;
+}
+
+void update_gpu_handle(struct gpu_descriptor_info *descriptor_info, 
+                      UINT index)
+{
+        descriptor_info->gpu_handle.ptr = descriptor_info->base_gpu_handle.ptr + 
                 index * descriptor_info->stride;
 }
 
@@ -515,6 +524,15 @@ void rec_set_descriptor_heap_cmd(struct gpu_cmd_list_info *cmd_list_info,
                 cmd_list_info->cmd_list, 1, &descriptor_info->descriptor_heap);
 }
 
+void rec_set_compute_root_descriptor_table_cmd(
+        struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
+        struct gpu_descriptor_info *descriptor_info)
+{
+        cmd_list_info->cmd_list->lpVtbl->SetComputeRootDescriptorTable(
+                cmd_list_info->cmd_list, root_param_index, 
+                descriptor_info->gpu_handle);
+}
+
 void rec_set_graphics_root_descriptor_table_cmd(
         struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
         struct gpu_descriptor_info *descriptor_info)
@@ -623,6 +641,18 @@ void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
         result = cmd_queue_info->cmd_queue->lpVtbl->Signal(
                 cmd_queue_info->cmd_queue, fence_info->fence, 
                 fence_info->fence_values[index]);
+        show_error_if_failed(result);
+}
+
+void wait_for_fence(struct gpu_cmd_queue_info *cmd_queue_info,
+                   struct gpu_fence_info *fence_info)
+{
+        HRESULT result;
+
+        result = cmd_queue_info->cmd_queue->lpVtbl->Wait(
+                cmd_queue_info->cmd_queue, fence_info->fence,
+                fence_info->cur_fence_value);
+
         show_error_if_failed(result);
 }
 
