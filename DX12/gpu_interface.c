@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <assert.h>
+#include <stdio.h>
 
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "dxguid.lib")
@@ -537,9 +538,9 @@ void rec_set_graphics_root_descriptor_table_cmd(
         struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
         struct gpu_descriptor_info *descriptor_info)
 {
-    cmd_list_info->cmd_list->lpVtbl->SetGraphicsRootDescriptorTable(
-            cmd_list_info->cmd_list, root_param_index, 
-            descriptor_info->gpu_handle);
+        cmd_list_info->cmd_list->lpVtbl->SetGraphicsRootDescriptorTable(
+                cmd_list_info->cmd_list, root_param_index, 
+                descriptor_info->gpu_handle);
 }
 
 void rec_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
@@ -641,17 +642,22 @@ void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
         result = cmd_queue_info->cmd_queue->lpVtbl->Signal(
                 cmd_queue_info->cmd_queue, fence_info->fence, 
                 fence_info->fence_values[index]);
+
         show_error_if_failed(result);
 }
 
 void wait_for_fence(struct gpu_cmd_queue_info *cmd_queue_info,
-                   struct gpu_fence_info *fence_info)
+                   struct gpu_fence_info *fence_info, UINT index)
 {
+        UINT64 fence_val = fence_info->fence_values[index];
+
         HRESULT result;
 
         result = cmd_queue_info->cmd_queue->lpVtbl->Wait(
                 cmd_queue_info->cmd_queue, fence_info->fence,
-                fence_info->cur_fence_value);
+                fence_val);
+
+        fence_info->fence_values[index] = fence_info->cur_fence_value + 1;
 
         show_error_if_failed(result);
 }
@@ -662,6 +668,7 @@ void wait_for_gpu(struct gpu_fence_info *fence_info, UINT index)
 
         if (fence_info->fence->lpVtbl->GetCompletedValue(fence_info->fence) < 
                 fence_val) {
+
                 HRESULT result;
 
                 result = fence_info->fence->lpVtbl->SetEventOnCompletion(
@@ -699,13 +706,11 @@ void compile_shader(struct gpu_shader_info *shader_info)
 
         shader_info->shader_byte_code =
                 shader_info->shader_blob->lpVtbl->GetBufferPointer(
-                        shader_info->shader_blob
-                );
+                        shader_info->shader_blob);
 
         shader_info->shader_byte_code_len = 
                 shader_info->shader_blob->lpVtbl->GetBufferSize(
-                        shader_info->shader_blob
-                );
+                        shader_info->shader_blob);
 }
 
 void release_shader(struct gpu_shader_info *shader_info)

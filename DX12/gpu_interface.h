@@ -174,7 +174,7 @@ void release_fence(struct gpu_fence_info *fence_info);
 void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
                struct gpu_fence_info *fence_info, UINT index);
 void wait_for_fence(struct gpu_cmd_queue_info *cmd_queue_info,
-                   struct gpu_fence_info *fence_info);
+                   struct gpu_fence_info *fence_info, UINT index);
 void wait_for_gpu(struct gpu_fence_info *fence_info, UINT index);
 
 

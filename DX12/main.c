@@ -26,9 +26,9 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         create_gpu_device(&device_info);
 
         // Create command queue
-        struct gpu_cmd_queue_info direct_queue_info;
-        direct_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        create_cmd_queue(&device_info, &direct_queue_info);
+        struct gpu_cmd_queue_info render_queue_info;
+        render_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        create_cmd_queue(&device_info, &render_queue_info);
 
         // Create compute queue
         struct gpu_cmd_queue_info compute_queue_info;
@@ -44,7 +44,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct swapchain_info swp_chain_info;
         swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swp_chain_info.buffer_count = 2;
-        create_swapchain(&wnd_info, &direct_queue_info, &swp_chain_info);
+        create_swapchain(&wnd_info, &render_queue_info, &swp_chain_info);
         
         // Create swapchain render target descriptor
         struct gpu_descriptor_info rtv_descriptor_info;
@@ -110,20 +110,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         create_cmd_list(&device_info, &compute_cmd_allocator_info,
                 &compute_cmd_list_info);
 
-        // Create fence for synchronizing frames of draw commands
-        struct gpu_fence_info render_fence_info;
-        render_fence_info.num_fence_value = swp_chain_info.buffer_count;
-        create_fence(&device_info, &render_fence_info);
- 
-        // Create fence for synchronizing copy and direct queue
-        struct gpu_fence_info copy_fence_info;
-        copy_fence_info.num_fence_value = 1;
-        create_fence(&device_info, &copy_fence_info);
-
-        // Create fence for synchronizing compute and direct queue
-        struct gpu_fence_info compute_fence_info;
-        compute_fence_info.num_fence_value = 1;
-        create_fence(&device_info, &compute_fence_info);
+        // Create fence for synchronizing
+        struct gpu_fence_info fence_info;
+        fence_info.num_fence_value = swp_chain_info.buffer_count;
+        create_fence(&device_info, &fence_info);
 
         // Create triangle mesh
         struct mesh_info triangle_mesh;
@@ -208,11 +198,11 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Exexute command list
         execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
 
-        // Signal gpu regarding copy queue work
-        signal_gpu(&copy_queue_info, &copy_fence_info, 0);
+        // Get current back buffer index
+        UINT back_buffer_index = get_backbuffer_index(&swp_chain_info);
 
-        // Render queue should wait for copy queue work to be done
-        wait_for_fence(&direct_queue_info, &copy_fence_info);
+        // Signal gpu regarding copy queue work
+        signal_gpu(&copy_queue_info, &fence_info, back_buffer_index);
 
         // Transition gpu vertex shader resource from copy to vertex buffer
         transition_resource(&render_cmd_list_info, &vert_gpu_resource_info,
@@ -389,7 +379,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Get checker board texture material
         struct material_info checkerboard_mat_info;
         get_checkerboard_tex(tex_resource_info.width, tex_resource_info.height,
-            &checkerboard_mat_info);
+                &checkerboard_mat_info);
 
         // Create texture upload resource
         struct gpu_resource_info tex_upload_resource_info;
@@ -427,6 +417,9 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Upload texture resource
         upload_resources(&tex_upload_resource_info, checkerboard_mat_info.tex);
 
+        // Make sure vertex and index upload is done before copy command allocator and list is reset
+        wait_for_gpu(&fence_info, back_buffer_index);
+
         reset_cmd_allocators(&copy_cmd_allocator_info);
 
         reset_cmd_list(&copy_cmd_allocator_info, &copy_cmd_list_info, 0);
@@ -445,10 +438,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
 
         // Signal GPU for texture upload of copy queue work
-        signal_gpu(&copy_queue_info, &copy_fence_info, 0);
+        signal_gpu(&copy_queue_info, &fence_info, back_buffer_index);
 
         // Make sure compute queue which will use the texture waits for it be uploaded
-        wait_for_fence(&compute_queue_info, &copy_fence_info);
+        wait_for_fence(&compute_queue_info, &fence_info, back_buffer_index);
 
         // Compile compute shader
         struct gpu_shader_info comp_shader_info;
@@ -460,30 +453,30 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_root_param_info compute_root_param_infos[2];
 
         compute_root_param_infos[0].range_type =
-            D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+                D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         compute_root_param_infos[0].num_descriptors = 1;
         compute_root_param_infos[0].shader_visbility =
-            D3D12_SHADER_VISIBILITY_ALL;
+                D3D12_SHADER_VISIBILITY_ALL;
 
         compute_root_param_infos[1].range_type =
-            D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+                D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
         compute_root_param_infos[1].num_descriptors = 1;
         compute_root_param_infos[1].shader_visbility =
-            D3D12_SHADER_VISIBILITY_ALL;
+                D3D12_SHADER_VISIBILITY_ALL;
 
         struct gpu_root_sig_info compute_root_sig_info;
         create_root_sig(&device_info, compute_root_param_infos, 2,
-            &compute_root_sig_info);
+                &compute_root_sig_info);
 
         // Create compute pipeline state object
         struct gpu_pso_info compute_pso_info;
         compute_pso_info.type = PSO_TYPE_COMPUTE;
         compute_pso_info.compute_pso_info.comp_shader_byte_code =
-            comp_shader_info.shader_byte_code;
+                comp_shader_info.shader_byte_code;
         compute_pso_info.compute_pso_info.comp_shader_byte_code_len =
-            comp_shader_info.shader_byte_code_len;
+                comp_shader_info.shader_byte_code_len;
         create_pso(&device_info, NULL, &compute_root_sig_info,
-            &compute_pso_info);
+                &compute_pso_info);
 
         // Create constant buffer descriptor for compute
         struct gpu_descriptor_info compute_cbv_srv_uav_descriptor_info;
@@ -511,8 +504,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 D3D12_RESOURCE_STATE_GENERIC_READ;
         create_resource(&device_info, &compute_cbv_resource_info);
 
-        float sec = 1.5708f;
-        upload_resources(&compute_cbv_resource_info, &sec);
+        time_t previous_time_in_sec = time_in_secs();
 
         // Create constant buffer view
         create_constant_buffer_view(&device_info,
@@ -525,13 +517,17 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         create_unorderd_access_view(&device_info, 
                 &compute_cbv_srv_uav_descriptor_info, &tex_resource_info);
 
-        // Get current back buffer index
-        UINT back_buffer_index = get_backbuffer_index(&swp_chain_info);
-
         //Render loop
         UINT window_msg = WM_NULL;
         do {
                 window_msg = window_message_loop();
+
+                time_t current_time_in_sec = time_in_secs();
+                time_t sec = current_time_in_sec - previous_time_in_sec;
+
+                float float_sec = (float) sec;
+
+                upload_resources(&compute_cbv_resource_info, &float_sec);
 
                 // Transition texture shader resource to read/write buffer
                 transition_resource(&compute_cmd_list_info, &tex_resource_info,
@@ -574,9 +570,9 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 // Exexute command list
                 execute_cmd_list(&compute_queue_info, &compute_cmd_list_info);
 
-                signal_gpu(&compute_queue_info, &compute_fence_info, 0);
+                signal_gpu(&compute_queue_info, &fence_info, back_buffer_index);
 
-                wait_for_fence(&direct_queue_info, &compute_fence_info);
+                wait_for_fence(&render_queue_info, &fence_info, back_buffer_index);
 
                 // Transition texture shader resource to read/write buffer
                 transition_resource(&render_cmd_list_info, &tex_resource_info,
@@ -671,22 +667,22 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 close_cmd_list(&render_cmd_list_info);
 
                 // Exexute command list
-                execute_cmd_list(&direct_queue_info, &render_cmd_list_info);
+                execute_cmd_list(&render_queue_info, &render_cmd_list_info);
 
                 // Present swapchain
                 present_swapchain(&swp_chain_info);
 
                  // Signal GPU
-                signal_gpu(&direct_queue_info, &render_fence_info, 
+                signal_gpu(&render_queue_info, &fence_info,
                         back_buffer_index);
 
-                wait_for_fence(&compute_queue_info, &render_fence_info);
-
-                // Wait for gpu to finish previous frame
-                wait_for_gpu(&render_fence_info, back_buffer_index);
+                wait_for_fence(&compute_queue_info, &fence_info, back_buffer_index);
 
                 // Get the next frame's buffer index
                 back_buffer_index = get_backbuffer_index(&swp_chain_info);
+
+                // Wait for gpu to finish previous frame
+                wait_for_gpu(&fence_info, back_buffer_index);
 
                 // Reset command allocator
                 reset_cmd_allocator(&render_cmd_allocator_info, 
@@ -706,9 +702,9 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         } while (window_msg != WM_QUIT);
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(&direct_queue_info, &render_fence_info, back_buffer_index);
+        signal_gpu(&render_queue_info, &fence_info, back_buffer_index);
 
-        wait_for_gpu(&render_fence_info, back_buffer_index);
+        wait_for_gpu(&fence_info, back_buffer_index);
 
         release_resource(&compute_cbv_resource_info);
 
@@ -731,6 +727,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
         // Release grahics pipeline state object
         release_pso(&graphics_pso_info);
+
+        release_root_sig(&compute_root_sig_info);
 
         // Release root signature
         release_root_sig(&graphics_root_sig_info);
@@ -765,14 +763,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Release triangle data 
         release_triangle(&triangle_mesh);
 
-        // Relase compute fence
-        release_fence(&compute_fence_info);
-
-        // Release copy fence
-        release_fence(&copy_fence_info);
-
         // Release render fence
-        release_fence(&render_fence_info);
+        release_fence(&fence_info);
 
         // Release compute command list
         release_cmd_list(&compute_cmd_list_info);
@@ -808,7 +800,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
         release_cmd_queue(&compute_queue_info);
 
-        release_cmd_queue(&direct_queue_info);
+        release_cmd_queue(&render_queue_info);
  
         release_gpu_device(&device_info);
 
