@@ -25,7 +25,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_device_info device_info;
         create_gpu_device(&device_info);
 
-        // Create command queue
+        // Create render queue
         struct gpu_cmd_queue_info render_queue_info;
         render_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         create_cmd_queue(&device_info, &render_queue_info);
