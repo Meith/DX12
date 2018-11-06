@@ -54,6 +54,28 @@ void create_swapchain(struct window_info *wnd_info,
         swapchain1->lpVtbl->Release(swapchain1);
 }
 
+void resize_swapchain(struct window_info *wnd_info,
+                     struct swapchain_info *swp_chain_info)
+{
+        HRESULT result;
+
+        result = swp_chain_info->swapchain4->lpVtbl->ResizeBuffers(
+                swp_chain_info->swapchain4, swp_chain_info->buffer_count,
+                wnd_info->width, wnd_info->height, swp_chain_info->format,
+                DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+
+        show_error_if_failed(result);
+}
+
+void set_fullscreen_swapchain(BOOL is_fullscreen, 
+                             struct swapchain_info *swp_chain_info)
+{
+        HRESULT result;
+
+        result = swp_chain_info->swapchain4->lpVtbl->SetFullscreenState(
+                swp_chain_info->swapchain4, is_fullscreen, NULL);
+}
+
 UINT get_backbuffer_index(struct swapchain_info *swp_chain_info)
 {
         return swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(

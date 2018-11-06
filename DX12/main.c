@@ -522,6 +522,18 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         do {
                 window_msg = window_message_loop();
 
+                if (window_msg == WM_SIZE)
+                {
+                        // Wait for GPU to finish up be starting the cleaning
+                        signal_gpu(&render_queue_info, &fence_info, back_buffer_index);
+                        wait_for_gpu(&fence_info, back_buffer_index);
+
+                        resize_window(&wnd_info);
+                        resize_swapchain(&wnd_info, &swp_chain_info);
+                        create_rendertarget_view(&device_info, &rtv_descriptor_info,
+                                rtv_resource_info);
+                }
+
                 time_t current_time_in_sec = time_in_secs();
                 time_t sec = current_time_in_sec - previous_time_in_sec;
 

@@ -7,7 +7,7 @@ void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
 {
         // Fill in window class struct
         WNDCLASSEX wc;
-        wc.cbSize = sizeof(WNDCLASSEX);
+        wc.cbSize = sizeof (WNDCLASSEX);
         wc.style = CS_HREDRAW | CS_VREDRAW;
         wc.lpfnWndProc = WindowProc;
         wc.cbClsExtra = 0;
@@ -35,27 +35,48 @@ void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
         ShowWindow(wnd_info->hwnd, nCmdShow);
 }
 
+void resize_window(struct window_info *wnd_info)
+{
+        RECT client_rect;
+        GetClientRect(wnd_info->hwnd, &client_rect);
+        wnd_info->width = client_rect.right - client_rect.left;
+        wnd_info->height = client_rect.bottom - client_rect.top;
+}
+
 UINT window_message_loop()
 {
         MSG msg;
         // Run message loop
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                switch (msg.message)
+                {
+                        case WM_SIZE :
+                                break;
+                        default :
+                        {
+                                TranslateMessage(&msg);
+                                DispatchMessage(&msg);
+                        }
+                }
         }
 
         return msg.message;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
+{        
         switch (msg)
         {
-                case WM_DESTROY:
+                case WM_DESTROY :
+                {
                         PostQuitMessage(0);
                         break;
+                }
 
-                default:
+                case WM_SIZE:
+                        break;
+
+                default :
                         return DefWindowProc(hwnd, msg, wparam, lparam);
         }   
 

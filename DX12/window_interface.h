@@ -16,6 +16,7 @@ struct window_info {
 
 void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
                   int nCmdShow);
+void resize_window(struct window_info *wnd_info);
 UINT window_message_loop();
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 void destroy_window(struct window_info *wnd_info, HINSTANCE hInstance);
