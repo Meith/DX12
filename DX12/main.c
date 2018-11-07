@@ -20,15 +20,31 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         wnd_info.height = 600;
 
         create_window(&wnd_info, hInstance, nCmdShow);
+        HWND hwnd = wnd_info.hwnd;
+        SetWindowLongPtr(wnd_info.hwnd, 0, (LONG_PTR) &wnd_info);
+
+        struct window_info *wnd_infoTest =
+            (struct window_info *)
+            GetWindowLongPtr(wnd_info.hwnd, 0);
 
         // Create device
         struct gpu_device_info device_info;
         create_gpu_device(&device_info);
+        SetWindowLongPtr(wnd_info.hwnd, 1, (LONG_PTR) &device_info);
+
+        struct gpu_device_info *device_infoTest =
+            (struct gpu_device_info *)
+            GetWindowLongPtr(hwnd, 1);
 
         // Create render queue
         struct gpu_cmd_queue_info render_queue_info;
         render_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         create_cmd_queue(&device_info, &render_queue_info);
+        SetWindowLongPtr(wnd_info.hwnd, 2, (LONG_PTR) &render_queue_info);
+
+        struct gpu_cmd_queue_info *render_queue_infoTest =
+            (struct gpu_cmd_queue_info *)
+            GetWindowLongPtr(hwnd, 2);
 
         // Create compute queue
         struct gpu_cmd_queue_info compute_queue_info;
@@ -45,19 +61,34 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swp_chain_info.buffer_count = 2;
         create_swapchain(&wnd_info, &render_queue_info, &swp_chain_info);
+        SetWindowLongPtr(wnd_info.hwnd, 3, (LONG_PTR) &swp_chain_info);
         
+        struct swapchain_info *swp_chain_infoTest =
+            (struct swapchain_info *)
+            GetWindowLongPtr(hwnd, 3);
+
         // Create swapchain render target descriptor
         struct gpu_descriptor_info rtv_descriptor_info;
         rtv_descriptor_info.type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtv_descriptor_info.num_descriptors = swp_chain_info.buffer_count;
         rtv_descriptor_info.flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         create_descriptor(&device_info, &rtv_descriptor_info);
+        SetWindowLongPtr(wnd_info.hwnd, 4, (LONG_PTR) &rtv_descriptor_info);
+
+        struct gpu_descriptor_info *rtv_descriptor_infoTest =
+            (struct gpu_descriptor_info *)
+            GetWindowLongPtr(hwnd, 4);
 
         // Get swapchain render target resource
         struct gpu_resource_info *rtv_resource_info;
         rtv_resource_info = malloc(
                 rtv_descriptor_info.num_descriptors *
                 sizeof (struct gpu_resource_info));
+        SetWindowLongPtr(wnd_info.hwnd, 5, (LONG_PTR) rtv_resource_info);
+
+        struct gpu_resource_info *rtv_resource_infoTest =
+            (struct gpu_resource_info *)
+            GetWindowLongPtr(hwnd, 5);
 
         for (UINT i = 0; i < rtv_descriptor_info.num_descriptors; ++i) {
                 rtv_resource_info[i].resource = get_swapchain_buffer(
@@ -114,6 +145,11 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_fence_info fence_info;
         fence_info.num_fence_value = swp_chain_info.buffer_count;
         create_fence(&device_info, &fence_info);
+        SetWindowLongPtr(wnd_info.hwnd, 6, (LONG_PTR) &fence_info);
+
+        struct gpu_fence_info *fence_infoTest =
+            (struct gpu_fence_info *)
+            GetWindowLongPtr(hwnd, 6);
 
         // Create triangle mesh
         struct mesh_info triangle_mesh;
@@ -518,21 +554,9 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 &compute_cbv_srv_uav_descriptor_info, &tex_resource_info);
 
         //Render loop
-        UINT window_msg = WM_NULL;
+        UINT queued_window_msg = WM_NULL;
         do {
-                window_msg = window_message_loop();
-
-                if (window_msg == WM_SIZE)
-                {
-                        // Wait for GPU to finish up be starting the cleaning
-                        signal_gpu(&render_queue_info, &fence_info, back_buffer_index);
-                        wait_for_gpu(&fence_info, back_buffer_index);
-
-                        resize_window(&wnd_info);
-                        resize_swapchain(&wnd_info, &swp_chain_info);
-                        create_rendertarget_view(&device_info, &rtv_descriptor_info,
-                                rtv_resource_info);
-                }
+                queued_window_msg = window_message_loop();
 
                 time_t current_time_in_sec = time_in_secs();
                 time_t sec = current_time_in_sec - previous_time_in_sec;
@@ -711,7 +735,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 reset_cmd_list(&compute_cmd_allocator_info,
                         &compute_cmd_list_info, 0);
 
-        } while (window_msg != WM_QUIT);
+        } while (queued_window_msg != WM_QUIT);
 
         // Wait for GPU to finish up be starting the cleaning
         signal_gpu(&render_queue_info, &fence_info, back_buffer_index);
