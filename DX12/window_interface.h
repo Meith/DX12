@@ -16,9 +16,18 @@ struct window_info {
 
 void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
                   int nCmdShow);
-void resize_window(struct window_info *wnd_info);
 UINT window_message_loop();
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam, 
+                           LPARAM lparam);
+static void resize_window(struct window_info *wnd_info, 
+                         struct gpu_device_info *device_info,
+                         struct gpu_cmd_queue_info *render_queue_info,
+                         struct swapchain_info *swp_chain_info,
+                         struct gpu_descriptor_info *rtv_descriptor_info,
+                         struct gpu_resource_info *rtv_resource_info,
+                         struct gpu_fence_info *fence_info,
+                         struct gpu_descriptor_info *dsv_descriptor_info,
+                         struct gpu_resource_info *dsv_resource_info);
 void destroy_window(struct window_info *wnd_info, HINSTANCE hInstance);
 
 #endif

@@ -1,7 +1,6 @@
 #ifndef SWAPCHAIN_INTERFACE_H
 #define SWAPCHAIN_INTERFACE_H
 
-#include "window_interface.h"
 #include "gpu_interface.h"
 
 #include <dxgi1_5.h>
@@ -10,6 +9,7 @@
 struct swapchain_info {
         DXGI_FORMAT format;
         UINT buffer_count;
+        UINT current_buffer_index;
         IDXGIFactory5 *factory5;
         IDXGISwapChain4 *swapchain4;
 };

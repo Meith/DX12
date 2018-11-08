@@ -1,7 +1,9 @@
 #include "swapchain_inerface.h"
+#include "window_interface.h"
 #include "error.h"
 
 #pragma comment (lib, "dxgi.lib")
+
 
 void create_swapchain(struct window_info *wnd_info, 
                      struct gpu_cmd_queue_info *cmd_queue_info,
@@ -52,6 +54,10 @@ void create_swapchain(struct window_info *wnd_info,
         show_error_if_failed(result);
 
         swapchain1->lpVtbl->Release(swapchain1);
+
+        swp_chain_info->current_buffer_index = 
+                swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(
+                swp_chain_info->swapchain4);
 }
 
 void resize_swapchain(struct window_info *wnd_info,
@@ -63,6 +69,10 @@ void resize_swapchain(struct window_info *wnd_info,
                 swp_chain_info->swapchain4, swp_chain_info->buffer_count,
                 wnd_info->width, wnd_info->height, swp_chain_info->format,
                 DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+
+        swp_chain_info->current_buffer_index = 
+                swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(
+                swp_chain_info->swapchain4);
 
         show_error_if_failed(result);
 }
@@ -104,6 +114,10 @@ void present_swapchain(struct swapchain_info *swp_chain_info)
         result = swp_chain_info->swapchain4->lpVtbl->Present(
                 swp_chain_info->swapchain4, 0, 0);
         show_error_if_failed(result);
+
+        swp_chain_info->current_buffer_index = 
+                swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(
+                swp_chain_info->swapchain4);
 }
 
 void release_swapchain(struct swapchain_info *swp_chain_info)

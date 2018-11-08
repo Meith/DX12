@@ -18,33 +18,16 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         wnd_info.y = 100;
         wnd_info.width = 800;
         wnd_info.height = 600;
-
         create_window(&wnd_info, hInstance, nCmdShow);
-        HWND hwnd = wnd_info.hwnd;
-        SetWindowLongPtr(wnd_info.hwnd, 0, (LONG_PTR) &wnd_info);
-
-        struct window_info *wnd_infoTest =
-            (struct window_info *)
-            GetWindowLongPtr(wnd_info.hwnd, 0);
 
         // Create device
         struct gpu_device_info device_info;
         create_gpu_device(&device_info);
-        SetWindowLongPtr(wnd_info.hwnd, 1, (LONG_PTR) &device_info);
-
-        struct gpu_device_info *device_infoTest =
-            (struct gpu_device_info *)
-            GetWindowLongPtr(hwnd, 1);
 
         // Create render queue
         struct gpu_cmd_queue_info render_queue_info;
         render_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         create_cmd_queue(&device_info, &render_queue_info);
-        SetWindowLongPtr(wnd_info.hwnd, 2, (LONG_PTR) &render_queue_info);
-
-        struct gpu_cmd_queue_info *render_queue_infoTest =
-            (struct gpu_cmd_queue_info *)
-            GetWindowLongPtr(hwnd, 2);
 
         // Create compute queue
         struct gpu_cmd_queue_info compute_queue_info;
@@ -61,11 +44,6 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swp_chain_info.buffer_count = 2;
         create_swapchain(&wnd_info, &render_queue_info, &swp_chain_info);
-        SetWindowLongPtr(wnd_info.hwnd, 3, (LONG_PTR) &swp_chain_info);
-        
-        struct swapchain_info *swp_chain_infoTest =
-            (struct swapchain_info *)
-            GetWindowLongPtr(hwnd, 3);
 
         // Create swapchain render target descriptor
         struct gpu_descriptor_info rtv_descriptor_info;
@@ -73,22 +51,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         rtv_descriptor_info.num_descriptors = swp_chain_info.buffer_count;
         rtv_descriptor_info.flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         create_descriptor(&device_info, &rtv_descriptor_info);
-        SetWindowLongPtr(wnd_info.hwnd, 4, (LONG_PTR) &rtv_descriptor_info);
-
-        struct gpu_descriptor_info *rtv_descriptor_infoTest =
-            (struct gpu_descriptor_info *)
-            GetWindowLongPtr(hwnd, 4);
 
         // Get swapchain render target resource
         struct gpu_resource_info *rtv_resource_info;
         rtv_resource_info = malloc(
                 rtv_descriptor_info.num_descriptors *
                 sizeof (struct gpu_resource_info));
-        SetWindowLongPtr(wnd_info.hwnd, 5, (LONG_PTR) rtv_resource_info);
-
-        struct gpu_resource_info *rtv_resource_infoTest =
-            (struct gpu_resource_info *)
-            GetWindowLongPtr(hwnd, 5);
 
         for (UINT i = 0; i < rtv_descriptor_info.num_descriptors; ++i) {
                 rtv_resource_info[i].resource = get_swapchain_buffer(
@@ -145,11 +113,6 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_fence_info fence_info;
         fence_info.num_fence_value = swp_chain_info.buffer_count;
         create_fence(&device_info, &fence_info);
-        SetWindowLongPtr(wnd_info.hwnd, 6, (LONG_PTR) &fence_info);
-
-        struct gpu_fence_info *fence_infoTest =
-            (struct gpu_fence_info *)
-            GetWindowLongPtr(hwnd, 6);
 
         // Create triangle mesh
         struct mesh_info triangle_mesh;
@@ -234,11 +197,9 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Exexute command list
         execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
 
-        // Get current back buffer index
-        UINT back_buffer_index = get_backbuffer_index(&swp_chain_info);
-
         // Signal gpu regarding copy queue work
-        signal_gpu(&copy_queue_info, &fence_info, back_buffer_index);
+        signal_gpu(&copy_queue_info, &fence_info, 
+                swp_chain_info.current_buffer_index);
 
         // Transition gpu vertex shader resource from copy to vertex buffer
         transition_resource(&render_cmd_list_info, &vert_gpu_resource_info,
@@ -454,7 +415,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         upload_resources(&tex_upload_resource_info, checkerboard_mat_info.tex);
 
         // Make sure vertex and index upload is done before copy command allocator and list is reset
-        wait_for_gpu(&fence_info, back_buffer_index);
+        wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
 
         reset_cmd_allocators(&copy_cmd_allocator_info);
 
@@ -474,10 +435,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
 
         // Signal GPU for texture upload of copy queue work
-        signal_gpu(&copy_queue_info, &fence_info, back_buffer_index);
+        signal_gpu(&copy_queue_info, &fence_info, 
+                swp_chain_info.current_buffer_index);
 
         // Make sure compute queue which will use the texture waits for it be uploaded
-        wait_for_fence(&compute_queue_info, &fence_info, back_buffer_index);
+        wait_for_fence(&compute_queue_info, &fence_info, 
+                swp_chain_info.current_buffer_index);
 
         // Compile compute shader
         struct gpu_shader_info comp_shader_info;
@@ -553,7 +516,14 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         create_unorderd_access_view(&device_info, 
                 &compute_cbv_srv_uav_descriptor_info, &tex_resource_info);
 
-        //Render loop
+        LONG_PTR wndproc_data[] = { (LONG_PTR) &wnd_info, 
+                (LONG_PTR) &device_info, (LONG_PTR) &render_queue_info,
+                (LONG_PTR) &swp_chain_info, (LONG_PTR) &rtv_descriptor_info,
+                (LONG_PTR) rtv_resource_info, (LONG_PTR) &fence_info,
+                (LONG_PTR) &dsv_descriptor_info, (LONG_PTR) &dsv_resource_info
+        };
+        SetWindowLongPtr(wnd_info.hwnd, GWLP_USERDATA, (LONG_PTR) wndproc_data);
+
         UINT queued_window_msg = WM_NULL;
         do {
                 queued_window_msg = window_message_loop();
@@ -606,20 +576,23 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 // Exexute command list
                 execute_cmd_list(&compute_queue_info, &compute_cmd_list_info);
 
-                signal_gpu(&compute_queue_info, &fence_info, back_buffer_index);
+                signal_gpu(&compute_queue_info, &fence_info, 
+                        swp_chain_info.current_buffer_index);
 
-                wait_for_fence(&render_queue_info, &fence_info, back_buffer_index);
+                wait_for_fence(&render_queue_info, &fence_info, 
+                        swp_chain_info.current_buffer_index);
 
                 // Transition texture shader resource to read/write buffer
                 transition_resource(&render_cmd_list_info, &tex_resource_info,
                         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
                 transition_resource(&render_cmd_list_info,
-                        &rtv_resource_info[back_buffer_index],
+                        &rtv_resource_info[swp_chain_info.current_buffer_index],
                         D3D12_RESOURCE_STATE_RENDER_TARGET);
 
                 // Point render target view cpu handle to correct descriptor in descriptor heap
-                update_cpu_handle(&rtv_descriptor_info, back_buffer_index);
+                update_cpu_handle(&rtv_descriptor_info, 
+                        swp_chain_info.current_buffer_index);
 
                 // Set the render target and depth target
                 rec_set_render_target_cmd(&render_cmd_list_info, 
@@ -693,7 +666,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
                 // Transition render target buffer to present state
                 transition_resource(&render_cmd_list_info,
-                        &rtv_resource_info[back_buffer_index], 
+                        &rtv_resource_info[swp_chain_info.current_buffer_index],
                         D3D12_RESOURCE_STATE_PRESENT);
 
                 transition_resource(&render_cmd_list_info, &tex_resource_info,
@@ -708,25 +681,24 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 // Present swapchain
                 present_swapchain(&swp_chain_info);
 
-                 // Signal GPU
+                // Signal GPU
                 signal_gpu(&render_queue_info, &fence_info,
-                        back_buffer_index);
+                        swp_chain_info.current_buffer_index);
 
-                wait_for_fence(&compute_queue_info, &fence_info, back_buffer_index);
-
-                // Get the next frame's buffer index
-                back_buffer_index = get_backbuffer_index(&swp_chain_info);
+                wait_for_fence(&compute_queue_info, &fence_info, 
+                        swp_chain_info.current_buffer_index);
 
                 // Wait for gpu to finish previous frame
-                wait_for_gpu(&fence_info, back_buffer_index);
+                wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
 
                 // Reset command allocator
                 reset_cmd_allocator(&render_cmd_allocator_info, 
-                        back_buffer_index);
+                        swp_chain_info.current_buffer_index);
 
                 // Reset command list
                 reset_cmd_list(&render_cmd_allocator_info, 
-                        &render_cmd_list_info, back_buffer_index);
+                        &render_cmd_list_info, 
+                        swp_chain_info.current_buffer_index);
 
                 // Reset command allocator
                 reset_cmd_allocators(&compute_cmd_allocator_info);
@@ -738,9 +710,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         } while (queued_window_msg != WM_QUIT);
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(&render_queue_info, &fence_info, back_buffer_index);
+        signal_gpu(&render_queue_info, &fence_info, 
+                swp_chain_info.current_buffer_index);
 
-        wait_for_gpu(&fence_info, back_buffer_index);
+        wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
 
         release_resource(&compute_cbv_resource_info);
 

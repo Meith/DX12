@@ -612,10 +612,12 @@ void create_fence(struct gpu_device_info *device_info,
                 fence_info->fence_values[i] = 0;
         }
 
+        fence_info->cur_fence_value = 0;
+
         HRESULT result;
 
         result = device_info->device->lpVtbl->CreateFence(
-                device_info->device, fence_info->fence_values[0],
+                device_info->device, fence_info->cur_fence_value,
                 D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, &fence_info->fence);
         show_error_if_failed(result);
 
@@ -635,7 +637,7 @@ void release_fence(struct gpu_fence_info *fence_info)
 void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
                struct gpu_fence_info *fence_info, UINT index)
 {
-        fence_info->cur_fence_value = fence_info->fence_values[index];
+        fence_info->fence_values[index] = ++(fence_info->cur_fence_value);
 
         HRESULT result;
 
@@ -657,8 +659,6 @@ void wait_for_fence(struct gpu_cmd_queue_info *cmd_queue_info,
                 cmd_queue_info->cmd_queue, fence_info->fence,
                 fence_val);
 
-        fence_info->fence_values[index] = fence_info->cur_fence_value + 1;
-
         show_error_if_failed(result);
 }
 
@@ -678,8 +678,6 @@ void wait_for_gpu(struct gpu_fence_info *fence_info, UINT index)
 
                 WaitForSingleObject(fence_info->fence_event, INFINITE);
         }
-
-        fence_info->fence_values[index] = fence_info->cur_fence_value + 1;
 }
 
 
