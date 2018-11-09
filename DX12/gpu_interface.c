@@ -451,6 +451,15 @@ void rec_copy_texture_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
                 NULL);
 }
 
+void rec_copy_resource_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                          struct gpu_resource_info *dst_resource_info,
+                          struct gpu_resource_info *src_resource_info)
+{
+        cmd_list_info->cmd_list->lpVtbl->CopyResource(
+                cmd_list_info->cmd_list, dst_resource_info->resource,
+                src_resource_info->resource);
+}
+
 void rec_clear_rtv_cmd(struct gpu_cmd_list_info *cmd_list_info, 
                       struct gpu_descriptor_info *rtv_desc_info, 
                       float *clear_colour)

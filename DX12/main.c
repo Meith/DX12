@@ -39,11 +39,16 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         copy_queue_info.type = D3D12_COMMAND_LIST_TYPE_COPY;
         create_cmd_queue(&device_info, &copy_queue_info);
 
+        // Create present queue
+        struct gpu_cmd_queue_info present_queue_info;
+        present_queue_info.type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        create_cmd_queue(&device_info, &present_queue_info);
+
         // Create swapchain
         struct swapchain_info swp_chain_info;
         swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swp_chain_info.buffer_count = 2;
-        create_swapchain(&wnd_info, &render_queue_info, &swp_chain_info);
+        create_swapchain(&wnd_info, &present_queue_info, &swp_chain_info);
 
         // Create swapchain render target descriptor
         struct gpu_descriptor_info rtv_descriptor_info;
@@ -69,6 +74,38 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Create swapchain render target view
         create_rendertarget_view(&device_info, &rtv_descriptor_info,
                 rtv_resource_info);
+
+        // Create intermediate render target descriptor
+        struct gpu_descriptor_info tmp_rtv_descriptor_info;
+        tmp_rtv_descriptor_info.type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        tmp_rtv_descriptor_info.num_descriptors = swp_chain_info.buffer_count;
+        tmp_rtv_descriptor_info.flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        create_descriptor(&device_info, &tmp_rtv_descriptor_info);
+
+        // Create intermediate render target resource
+        struct gpu_resource_info *tmp_rtv_resource_info;
+        tmp_rtv_resource_info = malloc(
+                tmp_rtv_descriptor_info.num_descriptors *
+                sizeof (struct gpu_resource_info));
+        for (UINT i = 0; i < tmp_rtv_descriptor_info.num_descriptors; ++i) {
+                tmp_rtv_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                tmp_rtv_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                tmp_rtv_resource_info[i].width = wnd_info.width;
+                tmp_rtv_resource_info[i].height = wnd_info.height;
+                tmp_rtv_resource_info[i].mip_levels = 1;
+                tmp_rtv_resource_info[i].format = swp_chain_info.format;
+                tmp_rtv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+                tmp_rtv_resource_info[i].flags = 
+                        D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                tmp_rtv_resource_info[i].current_state = 
+                        D3D12_RESOURCE_STATE_PRESENT;
+                create_resource(&device_info, &tmp_rtv_resource_info[i]);
+        }
+        
+        // Create intermediate render target view
+        create_rendertarget_view(&device_info, &tmp_rtv_descriptor_info,
+                 tmp_rtv_resource_info);
 
         // Create command allocators for draw commands
         struct gpu_cmd_allocator_info render_cmd_allocator_info;
@@ -100,7 +137,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_cmd_allocator_info compute_cmd_allocator_info;
         compute_cmd_allocator_info.cmd_list_type = 
                 D3D12_COMMAND_LIST_TYPE_COMPUTE;
-        compute_cmd_allocator_info.cmd_allocator_count = 1;
+        compute_cmd_allocator_info.cmd_allocator_count = 2;
         create_cmd_allocators(&device_info, &compute_cmd_allocator_info);
 
         // Create command list for copy commands
@@ -108,6 +145,20 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         compute_cmd_list_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
         create_cmd_list(&device_info, &compute_cmd_allocator_info,
                 &compute_cmd_list_info);
+
+        // Create command allocator for present queue
+        struct gpu_cmd_allocator_info present_cmd_allocator_info;
+        present_cmd_allocator_info.cmd_allocator_count =
+                swp_chain_info.buffer_count;
+        present_cmd_allocator_info.cmd_list_type =
+                D3D12_COMMAND_LIST_TYPE_DIRECT;
+        create_cmd_allocators(&device_info, &present_cmd_allocator_info);
+
+        // Create command list for present queue
+        struct gpu_cmd_list_info present_cmd_list_info;
+        present_cmd_list_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        create_cmd_list(&device_info, &present_cmd_allocator_info,
+                &present_cmd_list_info);
 
         // Create fence for synchronizing
         struct gpu_fence_info fence_info;
@@ -303,7 +354,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         graphics_pso_info.graphics_pso_info.geom_shader_byte_code = NULL;
         graphics_pso_info.graphics_pso_info.geom_shader_byte_code_len = 0;
         graphics_pso_info.graphics_pso_info.render_target_format = 
-                swp_chain_info.format;
+                tmp_rtv_resource_info[swp_chain_info.current_buffer_index].format;
         graphics_pso_info.graphics_pso_info.depth_target_format = 
                 dsv_resource_info.format;
         create_pso(&device_info, &vert_input_info, &graphics_root_sig_info,
@@ -586,22 +637,21 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 transition_resource(&render_cmd_list_info, &tex_resource_info,
                         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-                transition_resource(&render_cmd_list_info,
-                        &rtv_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-                // Point render target view cpu handle to correct descriptor in descriptor heap
-                update_cpu_handle(&rtv_descriptor_info, 
+                update_cpu_handle(&tmp_rtv_descriptor_info, 
                         swp_chain_info.current_buffer_index);
+
+                transition_resource(&render_cmd_list_info,
+                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index],
+                        D3D12_RESOURCE_STATE_RENDER_TARGET);
 
                 // Set the render target and depth target
                 rec_set_render_target_cmd(&render_cmd_list_info, 
-                        &rtv_descriptor_info, &dsv_descriptor_info);
+                        &tmp_rtv_descriptor_info, &dsv_descriptor_info);
 
                 // Clear render target
-                float clear_color[] = { 0.4f, 0.6f, 0.9f, 1.0f };
+                float clear_color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
                 rec_clear_rtv_cmd(&render_cmd_list_info, 
-                        &rtv_descriptor_info, clear_color);
+                        &tmp_rtv_descriptor_info, clear_color);
 
                 // Clear depth target
                 rec_clear_dsv_cmd(&render_cmd_list_info,
@@ -664,13 +714,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 rec_draw_indexed_instance_cmd(&render_cmd_list_info,
                         triangle_mesh.index_count, 1);
 
-                // Transition render target buffer to present state
-                transition_resource(&render_cmd_list_info,
-                        &rtv_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_PRESENT);
-
                 transition_resource(&render_cmd_list_info, &tex_resource_info,
                         D3D12_RESOURCE_STATE_COMMON);
+
+                transition_resource(&render_cmd_list_info,
+                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index],
+                        D3D12_RESOURCE_STATE_COPY_SOURCE);
 
                 // Close command list for execution
                 close_cmd_list(&render_cmd_list_info);
@@ -678,15 +727,48 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 // Exexute command list
                 execute_cmd_list(&render_queue_info, &render_cmd_list_info);
 
-                // Present swapchain
-                present_swapchain(&swp_chain_info);
-
-                // Signal GPU
+                // Signal GPU for render queue's completion
                 signal_gpu(&render_queue_info, &fence_info,
                         swp_chain_info.current_buffer_index);
 
+                // Compute queue needs to wait for render queue to be done
                 wait_for_fence(&compute_queue_info, &fence_info, 
                         swp_chain_info.current_buffer_index);
+
+                // Present queue needs to wait for render queue to be done
+                wait_for_fence(&present_queue_info, &fence_info,
+                        swp_chain_info.current_buffer_index);
+
+                // Point render target view cpu handle to correct descriptor in descriptor heap
+                update_cpu_handle(&rtv_descriptor_info, 
+                        swp_chain_info.current_buffer_index);
+
+                // Transition render target buffer to present state
+                transition_resource(&present_cmd_list_info,
+                        &rtv_resource_info[swp_chain_info.current_buffer_index],
+                        D3D12_RESOURCE_STATE_COPY_DEST);
+
+                rec_copy_resource_cmd(&present_cmd_list_info,
+                        &rtv_resource_info[swp_chain_info.current_buffer_index],
+                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index]);
+
+                // Transition render target buffer to present state
+                transition_resource(&present_cmd_list_info,
+                        &rtv_resource_info[swp_chain_info.current_buffer_index],
+                        D3D12_RESOURCE_STATE_PRESENT);
+
+                // Close command list for execution
+                close_cmd_list(&present_cmd_list_info);
+
+                // Exexute command list
+                execute_cmd_list(&present_queue_info, &present_cmd_list_info);
+
+                // Signal GPU for present queues completion
+                signal_gpu(&present_queue_info, &fence_info, 
+                        swp_chain_info.current_buffer_index);
+
+                // Present swapchain
+                present_swapchain(&swp_chain_info);
 
                 // Wait for gpu to finish previous frame
                 wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
@@ -707,10 +789,19 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 reset_cmd_list(&compute_cmd_allocator_info,
                         &compute_cmd_list_info, 0);
 
+                // Reset command allocator
+                reset_cmd_allocator(&present_cmd_allocator_info,
+                        swp_chain_info.current_buffer_index);
+
+                // Reset command list
+                reset_cmd_list(&present_cmd_allocator_info,
+                        &present_cmd_list_info,
+                        swp_chain_info.current_buffer_index);
+
         } while (queued_window_msg != WM_QUIT);
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(&render_queue_info, &fence_info, 
+        signal_gpu(&present_queue_info, &fence_info, 
                 swp_chain_info.current_buffer_index);
 
         wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
@@ -775,6 +866,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Release render fence
         release_fence(&fence_info);
 
+        release_cmd_list(&present_cmd_list_info);
+
         // Release compute command list
         release_cmd_list(&compute_cmd_list_info);
 
@@ -784,6 +877,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         // Release render command list
         release_cmd_list(&render_cmd_list_info);
 
+        release_cmd_allocators(&present_cmd_allocator_info);
+
         // Release compute command allocator
         release_cmd_allocators(&compute_cmd_allocator_info);
 
@@ -792,6 +887,14 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
         // Release render command allocator
         release_cmd_allocators(&render_cmd_allocator_info);
+
+        for (UINT i = 0; i < rtv_descriptor_info.num_descriptors; ++i) {
+                release_resource(tmp_rtv_resource_info);
+        }
+
+        free(tmp_rtv_resource_info);
+
+        release_descriptor(&tmp_rtv_descriptor_info);
 
         // Release the render target view buffers
         for (UINT i = 0; i < rtv_descriptor_info.num_descriptors; ++i) {

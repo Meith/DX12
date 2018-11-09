@@ -118,6 +118,9 @@ void rec_copy_buffer_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
 void rec_copy_texture_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
                                 struct gpu_resource_info *dst_resource_info,
                                 struct gpu_resource_info *src_resource_info);
+void rec_copy_resource_cmd(struct gpu_cmd_list_info *cmd_list_info,
+                          struct gpu_resource_info *dst_resource_info,
+                          struct gpu_resource_info *src_resource_info);
 void rec_clear_rtv_cmd(struct gpu_cmd_list_info *cmd_list_info,
                       struct gpu_descriptor_info *rtv_desc_info, 
                       float *clear_colour);
