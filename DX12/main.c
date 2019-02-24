@@ -8,8 +8,8 @@
 #include "misc.h"
 
 
-int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
-                    LPSTR lpCmdLine, int nCmdShow)
+int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
+        _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
 {
         struct window_info wnd_info;
         wnd_info.window_class_name = "DX12WindowClass";
@@ -378,38 +378,44 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         struct gpu_descriptor_info graphics_cbv_srv_uav_descriptor_info;
         graphics_cbv_srv_uav_descriptor_info.type = 
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        graphics_cbv_srv_uav_descriptor_info.num_descriptors =
-                graphics_root_param_infos[0].num_descriptors + 
-                graphics_root_param_infos[1].num_descriptors;
+        graphics_cbv_srv_uav_descriptor_info.num_descriptors = 
+                swp_chain_info.buffer_count * 
+                (graphics_root_param_infos[0].num_descriptors + 
+                graphics_root_param_infos[1].num_descriptors);
         graphics_cbv_srv_uav_descriptor_info.flags =
                 D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         create_descriptor(&device_info, &graphics_cbv_srv_uav_descriptor_info);
 
         // Create constant buffer resource
-        struct gpu_resource_info graphics_cbv_resource_info;
-        graphics_cbv_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
-        graphics_cbv_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        graphics_cbv_resource_info.width = 
-                align_offset(sizeof (cam_info.pv_mat), 256);
-        graphics_cbv_resource_info.height = 1;
-        graphics_cbv_resource_info.mip_levels = 1;
-        graphics_cbv_resource_info.format = DXGI_FORMAT_UNKNOWN;
-        graphics_cbv_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        graphics_cbv_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
-        graphics_cbv_resource_info.current_state = 
-                D3D12_RESOURCE_STATE_GENERIC_READ;
-        create_resource(&device_info, &graphics_cbv_resource_info);
+        struct gpu_resource_info *graphics_cbv_resource_info;
+        graphics_cbv_resource_info = malloc(
+                graphics_cbv_srv_uav_descriptor_info.num_descriptors *
+                sizeof (struct gpu_resource_info));
+        for (UINT i = 0; i < graphics_cbv_srv_uav_descriptor_info.num_descriptors; ++i) {
+                graphics_cbv_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
+                graphics_cbv_resource_info[i].dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+                graphics_cbv_resource_info[i].width =
+                        align_offset(sizeof (cam_info.pv_mat), 256);
+                graphics_cbv_resource_info[i].height = 1;
+                graphics_cbv_resource_info[i].mip_levels = 1;
+                graphics_cbv_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                graphics_cbv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                graphics_cbv_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
+                graphics_cbv_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_GENERIC_READ;
+                create_resource(&device_info, &graphics_cbv_resource_info[i]);
 
-        // Upload constant buffer resource
-        upload_resources(&graphics_cbv_resource_info, cam_info.pv_mat);
+                // Upload constant buffer resource
+                upload_resources(&graphics_cbv_resource_info[i], cam_info.pv_mat);
 
-        // Create constant buffer view
-        create_constant_buffer_view(&device_info, 
-                &graphics_cbv_srv_uav_descriptor_info, 
-                &graphics_cbv_resource_info);
+                update_cpu_handle(&graphics_cbv_srv_uav_descriptor_info,
+                        0 * graphics_cbv_srv_uav_descriptor_info.num_descriptors + i);
 
-        // Update descriptor heap pointer to point to texture resource
-        update_cpu_handle(&graphics_cbv_srv_uav_descriptor_info, 1);
+                // Create constant buffer view
+                create_constant_buffer_view(&device_info,
+                        &graphics_cbv_srv_uav_descriptor_info,
+                        &graphics_cbv_resource_info[i]);
+        }
 
         // Create texture resource
         struct gpu_resource_info tex_resource_info;
