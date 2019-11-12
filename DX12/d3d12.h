@@ -4789,11 +4789,11 @@ extern "C" {
 #define ID3D12DescriptorHeap_GetDesc(This)	\
     ( (This)->lpVtbl -> GetDesc(This) ) 
 
-#define ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(This)	\
-    ( (This)->lpVtbl -> GetCPUDescriptorHandleForHeapStart(This) ) 
+#define ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(This,pOut)	\
+    ( (This)->lpVtbl -> GetCPUDescriptorHandleForHeapStart(This,pOut) )
 
-#define ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(This)	\
-    ( (This)->lpVtbl -> GetGPUDescriptorHandleForHeapStart(This) ) 
+#define ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(This,pOut)	\
+    ( (This)->lpVtbl -> GetGPUDescriptorHandleForHeapStart(This,pOut) )
 
 #endif /* COBJMACROS */
 

@@ -4,6 +4,9 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 
 static inline size_t align_offset(size_t offset, size_t align)
 {
@@ -29,6 +32,19 @@ static inline void debug_print(const char *in_str, ...)
         OutputDebugString(out_str);
 
         va_end(arg_list);
+}
+
+static inline LPCWSTR create_wstring(const wchar_t *const in_str, ...)
+{
+    va_list arg_list;
+    va_start(arg_list, in_str);
+
+    wchar_t out_str[1024];
+    vswprintf(out_str, 1024, in_str, arg_list);
+
+    va_end(arg_list);
+    LPCWSTR test = out_str;
+    return test;
 }
 
 #endif
