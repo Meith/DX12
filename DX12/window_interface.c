@@ -6,7 +6,7 @@
 
 
 void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
-                  int nCmdShow)
+        int nCmdShow)
 {
         // Fill in window class struct
         WNDCLASSEX wc;
@@ -51,7 +51,7 @@ UINT window_message_loop()
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam, 
-                           LPARAM lparam)
+        LPARAM lparam)
 {       
         LONG_PTR *wndproc_data = (LONG_PTR *) 
                 GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -113,14 +113,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
 }
 
 static void resize_window(struct window_info *wnd_info, 
-                         struct gpu_device_info *device_info,
-                         struct gpu_cmd_queue_info *render_queue_info,
-                         struct swapchain_info *swp_chain_info,
-                         struct gpu_descriptor_info *rtv_descriptor_info,
-                         struct gpu_resource_info *rtv_resource_info,
-                         struct gpu_fence_info *fence_info,
-                         struct gpu_descriptor_info *dsv_descriptor_info,
-                         struct gpu_resource_info *dsv_resource_info)
+        struct gpu_device_info *device_info,
+        struct gpu_cmd_queue_info *render_queue_info,
+        struct swapchain_info *swp_chain_info,
+        struct gpu_descriptor_info *rtv_descriptor_info,
+        struct gpu_resource_info *rtv_resource_info,
+        struct gpu_fence_info *fence_info,
+        struct gpu_descriptor_info *dsv_descriptor_info,
+        struct gpu_resource_info *dsv_resource_info)
 {
         RECT client_rect;
         GetClientRect(wnd_info->hwnd, &client_rect);
@@ -148,6 +148,7 @@ static void resize_window(struct window_info *wnd_info,
                 rtv_resource_info[i].current_state =
                         D3D12_RESOURCE_STATE_PRESENT;
         }
+
         create_rendertarget_view(device_info, rtv_descriptor_info,
                 rtv_resource_info);
 

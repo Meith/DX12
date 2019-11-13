@@ -1,13 +1,14 @@
 #include "swapchain_inerface.h"
 #include "window_interface.h"
 #include "error.h"
+#include "misc.h"
 
 #pragma comment (lib, "dxgi.lib")
 
 
 void create_swapchain(struct window_info *wnd_info, 
-                     struct gpu_cmd_queue_info *cmd_queue_info,
-                     struct swapchain_info *swp_chain_info)
+        struct gpu_cmd_queue_info *cmd_queue_info,
+        struct swapchain_info *swp_chain_info)
 {
         // Describe swapchain
         DXGI_SWAP_CHAIN_DESC1 desc1;
@@ -61,7 +62,7 @@ void create_swapchain(struct window_info *wnd_info,
 }
 
 void resize_swapchain(struct window_info *wnd_info,
-                     struct swapchain_info *swp_chain_info)
+        struct swapchain_info *swp_chain_info)
 {
         HRESULT result;
 
@@ -78,7 +79,7 @@ void resize_swapchain(struct window_info *wnd_info,
 }
 
 void set_fullscreen_swapchain(BOOL is_fullscreen, 
-                             struct swapchain_info *swp_chain_info)
+        struct swapchain_info *swp_chain_info)
 {
         HRESULT result;
 
@@ -93,7 +94,7 @@ UINT get_backbuffer_index(struct swapchain_info *swp_chain_info)
 }
 
 ID3D12Resource *get_swapchain_buffer(struct swapchain_info *swp_chain_info,
-                                    UINT buffer_index)
+        UINT buffer_index)
 {
         ID3D12Resource *buffer;
 
@@ -103,6 +104,10 @@ ID3D12Resource *get_swapchain_buffer(struct swapchain_info *swp_chain_info,
                 swp_chain_info->swapchain4, buffer_index, &IID_ID3D12Resource,
                 &buffer);
         show_error_if_failed(result);
+
+        WCHAR str_buffer_index[1024];
+        create_wstring(str_buffer_index, L"Swapchain buffer %d", buffer_index);
+        ID3D12Object_SetName(buffer, str_buffer_index);
 
         return buffer;
 }

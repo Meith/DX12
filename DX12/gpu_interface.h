@@ -1,6 +1,8 @@
 #ifndef GPU_INTERFACE_H
 #define GPU_INTERFACE_H
 
+#define COBJMACROS
+
 // Including modified d3d12.h since their c interface is broken
 #include "d3d12.h"
 #include <d3dcompiler.h>
@@ -16,16 +18,18 @@ void release_gpu_device(struct gpu_device_info *device_info);
 
 
 struct gpu_cmd_queue_info {
+        WCHAR name[1024];
         D3D12_COMMAND_LIST_TYPE type;
         ID3D12CommandQueue *cmd_queue;
 };
 
 void create_cmd_queue(struct gpu_device_info *device_info,
-                     struct gpu_cmd_queue_info *cmd_queue_info);
+        struct gpu_cmd_queue_info *cmd_queue_info);
 void release_cmd_queue(struct gpu_cmd_queue_info *cmd_queue_info);
 
 
 struct gpu_resource_info {
+        WCHAR name[1024];
         D3D12_HEAP_TYPE type;
         D3D12_RESOURCE_DIMENSION dimension;
         UINT64 width;
@@ -40,12 +44,13 @@ struct gpu_resource_info {
 };
 
 void create_resource(struct gpu_device_info *device_info,
-                    struct gpu_resource_info *resource_info);
+        struct gpu_resource_info *resource_info);
 void release_resource(struct gpu_resource_info *resource_info);
 void upload_resources(struct gpu_resource_info *resource_info, void *src_data);
 
 
 struct gpu_descriptor_info {
+        WCHAR name[1024];
         D3D12_DESCRIPTOR_HEAP_TYPE type;
         UINT num_descriptors;
         D3D12_DESCRIPTOR_HEAP_FLAGS flags;
@@ -58,90 +63,91 @@ struct gpu_descriptor_info {
 };
 
 void create_descriptor(struct gpu_device_info *device_info,
-                      struct gpu_descriptor_info *descriptor_info);
+        struct gpu_descriptor_info *descriptor_info);
 void release_descriptor(struct gpu_descriptor_info *descriptor_info);
 void update_cpu_handle(struct gpu_descriptor_info *descriptor_info, 
-                      UINT index);
+        UINT index);
 void update_gpu_handle(struct gpu_descriptor_info *descriptor_info, 
-                      UINT index);
+        UINT index);
 void create_rendertarget_view(struct gpu_device_info *device_info,
-                             struct gpu_descriptor_info *descriptor_info,
-                             struct gpu_resource_info *resource_info);
+        struct gpu_descriptor_info *descriptor_info,
+        struct gpu_resource_info *resource_info);
 void create_depthstencil_view(struct gpu_device_info *device_info,
-                             struct gpu_descriptor_info *descriptor_info,
-                             struct gpu_resource_info *resource_info);
+        struct gpu_descriptor_info *descriptor_info,
+        struct gpu_resource_info *resource_info);
 void create_constant_buffer_view(struct gpu_device_info *device_info,
-                                struct gpu_descriptor_info *descriptor_info,
-                                struct gpu_resource_info *resource_info);
+        struct gpu_descriptor_info *descriptor_info,
+        struct gpu_resource_info *resource_info);
 void create_unorderd_access_view(struct gpu_device_info *device_info,
-                                struct gpu_descriptor_info *descriptor_info,
-                                struct gpu_resource_info *resource_info);
+        struct gpu_descriptor_info *descriptor_info,
+        struct gpu_resource_info *resource_info);
 void create_shader_resource_view(struct gpu_device_info *device_info,
-                                struct gpu_descriptor_info *descriptor_info,
-                                struct gpu_resource_info *resource_info);
+        struct gpu_descriptor_info *descriptor_info,
+        struct gpu_resource_info *resource_info);
 void create_sampler(struct gpu_device_info *device_info,
-                   struct gpu_descriptor_info *descriptor_info);
-
+        struct gpu_descriptor_info *descriptor_info);
 
 
 struct gpu_cmd_allocator_info {
+        WCHAR name[1024];
         D3D12_COMMAND_LIST_TYPE cmd_list_type;
         UINT cmd_allocator_count;
         ID3D12CommandAllocator **cmd_allocators;
 };
 
 void create_cmd_allocators(struct gpu_device_info *device_info,
-                          struct gpu_cmd_allocator_info *cmd_allocator_info);
+        struct gpu_cmd_allocator_info *cmd_allocator_info);
 void release_cmd_allocators(struct gpu_cmd_allocator_info *cmd_allocator_info);
 void reset_cmd_allocators(struct gpu_cmd_allocator_info *cmd_allocator_info);
 void reset_cmd_allocator(struct gpu_cmd_allocator_info *cmd_allocator_info, 
-                        UINT index);
+        UINT index);
 
 
 struct gpu_cmd_list_info {
+        WCHAR name[1024];
         D3D12_COMMAND_LIST_TYPE cmd_list_type;
         ID3D12GraphicsCommandList *cmd_list;
 };
 
 void create_cmd_list(struct gpu_device_info *device_info,
-                    struct gpu_cmd_allocator_info *cmd_allocator_info,
-                    struct gpu_cmd_list_info *cmd_list_info);
+        struct gpu_cmd_allocator_info *cmd_allocator_info, 
+        struct gpu_cmd_list_info *cmd_list_info);
 void release_cmd_list(struct gpu_cmd_list_info *cmd_list_info);
 void close_cmd_list(struct gpu_cmd_list_info *cmd_list_info);
 void execute_cmd_list(struct gpu_cmd_queue_info *cmd_queue_info,
-                     struct gpu_cmd_list_info *cmd_list_info);
+        struct gpu_cmd_list_info *cmd_list_info);
 void reset_cmd_list(struct gpu_cmd_allocator_info *cmd_allocator_info,
-                   struct gpu_cmd_list_info *cmd_list_info, UINT index);
+        struct gpu_cmd_list_info *cmd_list_info, UINT index);
 void rec_copy_buffer_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                               struct gpu_resource_info *dst_resource_info, 
-                               struct gpu_resource_info *src_resource_info);
+        struct gpu_resource_info *dst_resource_info, 
+        struct gpu_resource_info *src_resource_info);
 void rec_copy_texture_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                struct gpu_resource_info *dst_resource_info,
-                                struct gpu_resource_info *src_resource_info);
+        struct gpu_resource_info *dst_resource_info,
+        struct gpu_resource_info *src_resource_info);
 void rec_copy_resource_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                          struct gpu_resource_info *dst_resource_info,
-                          struct gpu_resource_info *src_resource_info);
+        struct gpu_resource_info *dst_resource_info,
+        struct gpu_resource_info *src_resource_info);
 void rec_clear_rtv_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                      struct gpu_descriptor_info *rtv_desc_info, 
-                      float *clear_colour);
+        struct gpu_descriptor_info *rtv_desc_info, float *clear_colour);
 void rec_clear_dsv_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                      struct gpu_descriptor_info *dsv_desc_info);
+        struct gpu_descriptor_info *dsv_desc_info);
 void rec_set_pipeline_state_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                               struct gpu_pso_info *pso_info);
+        struct gpu_pso_info *pso_info);
 void rec_set_render_target_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                              struct gpu_descriptor_info *rtv_desc_info,
-                              struct gpu_descriptor_info *dsv_desc_info);
+        struct gpu_descriptor_info *rtv_desc_info,
+        struct gpu_descriptor_info *dsv_desc_info);
 void rec_set_viewport_cmd(struct gpu_cmd_list_info *cmd_list_info, 
-                         struct gpu_viewport_info *viewport_info);
+        struct gpu_viewport_info *viewport_info);
 void rec_set_scissor_rect_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                             struct gpu_scissor_rect_info *scissor_rect_info);
-void rec_set_primitive_cmd(struct gpu_cmd_list_info *cmd_list_info);
+        struct gpu_scissor_rect_info *scissor_rect_info);
+void rec_set_primitive_cmd(struct gpu_cmd_list_info *cmd_list_info,
+        D3D_PRIMITIVE_TOPOLOGY prim_type);
 void rec_set_compute_root_sig_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                 struct gpu_root_sig_info *root_sig_info);
+        struct gpu_root_sig_info *root_sig_info);
 void rec_set_graphics_root_sig_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                  struct gpu_root_sig_info *root_sig_info);
+        struct gpu_root_sig_info *root_sig_info);
 void rec_set_descriptor_heap_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                struct gpu_descriptor_info *descriptor_info);
+        struct gpu_descriptor_info *descriptor_info);
 void rec_set_compute_root_descriptor_table_cmd(
         struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
         struct gpu_descriptor_info *descriptor_info);
@@ -149,21 +155,21 @@ void rec_set_graphics_root_descriptor_table_cmd(
         struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
         struct gpu_descriptor_info *descriptor_info);
 void rec_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                              struct gpu_resource_info *vert_buffer,
-                              UINT stride);
+        struct gpu_resource_info *vert_buffer, UINT stride);
 void rec_set_index_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                             struct gpu_resource_info *index_buffer);
+        struct gpu_resource_info *index_buffer);
 void rec_dispatch_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                     UINT thread_group_coun_x, UINT thread_group_coun_y,
-                     UINT thread_group_coun_z);
+        UINT thread_group_coun_x, UINT thread_group_coun_y, 
+        UINT thread_group_coun_z);
 void rec_draw_indexed_instance_cmd(struct gpu_cmd_list_info *cmd_list_info,
-                                  UINT index_count, UINT instance_count);
+        UINT index_count, UINT instance_count);
 void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
-                        struct gpu_resource_info *resource_info, 
-                        D3D12_RESOURCE_STATES resource_end_state);
+        struct gpu_resource_info *resource_info, 
+        D3D12_RESOURCE_STATES resource_end_state);
 
 
 struct gpu_fence_info {
+        WCHAR name[1024];
         UINT num_fence_value;
         UINT64 *fence_values;
         UINT64 cur_fence_value;
@@ -172,12 +178,12 @@ struct gpu_fence_info {
 };
 
 void create_fence(struct gpu_device_info *device_info, 
-                 struct gpu_fence_info *fence_info);
+        struct gpu_fence_info *fence_info);
 void release_fence(struct gpu_fence_info *fence_info);
 void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
-               struct gpu_fence_info *fence_info, UINT index);
+        struct gpu_fence_info *fence_info, UINT index);
 void wait_for_fence(struct gpu_cmd_queue_info *cmd_queue_info,
-                   struct gpu_fence_info *fence_info, UINT index);
+        struct gpu_fence_info *fence_info, UINT index);
 void wait_for_gpu(struct gpu_fence_info *fence_info, UINT index);
 
 
@@ -200,7 +206,7 @@ struct gpu_vert_input_info {
 };
 
 void setup_vertex_input(LPCSTR *attribute_names, DXGI_FORMAT *attribute_formats, 
-                       struct gpu_vert_input_info *input_info);
+        struct gpu_vert_input_info *input_info);
 void free_vertex_input(struct gpu_vert_input_info *input_info);
 
 
@@ -211,14 +217,14 @@ struct gpu_root_param_info {
 };
 
 struct gpu_root_sig_info {
+        WCHAR name[1024];
         ID3DBlob *root_sig_blob;
         ID3D12RootSignature *root_sig;
 };
 
 void create_root_sig(struct gpu_device_info *device_info,
-                    struct gpu_root_param_info *root_params,
-                    UINT num_root_params,
-                    struct gpu_root_sig_info *root_sig_info);
+        struct gpu_root_param_info *root_params, UINT num_root_params,
+        struct gpu_root_sig_info *root_sig_info);
 void release_root_sig(struct gpu_root_sig_info *root_sig_info);
 
 
@@ -249,6 +255,7 @@ struct gpu_compute_pso_info {
 };
 
 struct gpu_pso_info {
+        WCHAR name[1024];
         enum PSO_TYPE type;
         union {
                 struct gpu_graphics_pso_info graphics_pso_info;
@@ -258,16 +265,16 @@ struct gpu_pso_info {
 };
 
 void create_pso(struct gpu_device_info *device_info,
-               struct gpu_vert_input_info *vert_input_info, 
-               struct gpu_root_sig_info *root_sig_info,
-               struct gpu_pso_info *pso_info);
+        struct gpu_vert_input_info *vert_input_info, 
+        struct gpu_root_sig_info *root_sig_info,
+        struct gpu_pso_info *pso_info);
 static void create_graphics_pso(struct gpu_device_info *device_info,   
-                               struct gpu_vert_input_info *vert_input_info,
-                               struct gpu_root_sig_info *root_sig_info,
-                               struct gpu_pso_info *pso_info);
+        struct gpu_vert_input_info *vert_input_info,
+        struct gpu_root_sig_info *root_sig_info,
+        struct gpu_pso_info *pso_info);
 static void create_compute_pso(struct gpu_device_info *device_info,
-                              struct gpu_root_sig_info *root_sig_info,
-                              struct gpu_pso_info *pso_info);
+        struct gpu_root_sig_info *root_sig_info,
+        struct gpu_pso_info *pso_info);
 void release_pso(struct gpu_pso_info *pso_info);
 
 
