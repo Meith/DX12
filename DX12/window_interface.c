@@ -27,6 +27,8 @@ void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
         // Register window class struct
         RegisterClassEx(&wc);
 
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
         // Create the window
         wnd_info->hwnd = CreateWindowEx(0, wc.lpszClassName, 
                 wnd_info->window_name, WS_OVERLAPPEDWINDOW, wnd_info->x, 

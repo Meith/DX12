@@ -23,7 +23,7 @@ void create_swapchain(struct window_info *wnd_info,
         desc1.Scaling = DXGI_SCALING_NONE;
         desc1.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         desc1.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-        desc1.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+        desc1.Flags = 0;
 
         // Describe fullscreen swapchain
         DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullscreen_desc;
@@ -44,21 +44,19 @@ void create_swapchain(struct window_info *wnd_info,
 
         // Create swapchain
         IDXGISwapChain1 *swapchain1;
-        result = swp_chain_info->factory5->lpVtbl->CreateSwapChainForHwnd(
-                swp_chain_info->factory5,
+        result = IDXGIFactory5_CreateSwapChainForHwnd(swp_chain_info->factory5,
                 (IUnknown *) cmd_queue_info->cmd_queue, wnd_info->hwnd, 
                 &desc1, &fullscreen_desc, NULL, &swapchain1);
         show_error_if_failed(result);
 
-        result = swapchain1->lpVtbl->QueryInterface(swapchain1,
-                &IID_IDXGISwapChain4, &swp_chain_info->swapchain4);
+        result = IDXGIFactory5_QueryInterface(swapchain1,&IID_IDXGISwapChain4,
+                &swp_chain_info->swapchain4);
         show_error_if_failed(result);
 
-        swapchain1->lpVtbl->Release(swapchain1);
+        IDXGIFactory5_Release(swapchain1);
 
         swp_chain_info->current_buffer_index = 
-                swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(
-                swp_chain_info->swapchain4);
+                IDXGISwapChain4_GetCurrentBackBufferIndex(swp_chain_info->swapchain4);
 }
 
 void resize_swapchain(struct window_info *wnd_info,
@@ -66,16 +64,13 @@ void resize_swapchain(struct window_info *wnd_info,
 {
         HRESULT result;
 
-        result = swp_chain_info->swapchain4->lpVtbl->ResizeBuffers(
-                swp_chain_info->swapchain4, swp_chain_info->buffer_count,
-                wnd_info->width, wnd_info->height, swp_chain_info->format,
-                DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+        result = IDXGISwapChain4_ResizeBuffers(swp_chain_info->swapchain4,
+                swp_chain_info->buffer_count, wnd_info->width, wnd_info->height,
+                swp_chain_info->format, 0);
+        show_error_if_failed(result);
 
         swp_chain_info->current_buffer_index = 
-                swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(
-                swp_chain_info->swapchain4);
-
-        show_error_if_failed(result);
+                IDXGISwapChain4_GetCurrentBackBufferIndex(swp_chain_info->swapchain4);
 }
 
 void set_fullscreen_swapchain(BOOL is_fullscreen, 
@@ -83,14 +78,14 @@ void set_fullscreen_swapchain(BOOL is_fullscreen,
 {
         HRESULT result;
 
-        result = swp_chain_info->swapchain4->lpVtbl->SetFullscreenState(
-                swp_chain_info->swapchain4, is_fullscreen, NULL);
+        result = IDXGISwapChain4_SetFullscreenState(swp_chain_info->swapchain4,
+                is_fullscreen, NULL);
+        show_error_if_failed(result);
 }
 
 UINT get_backbuffer_index(struct swapchain_info *swp_chain_info)
 {
-        return swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(
-                swp_chain_info->swapchain4);
+        return IDXGISwapChain4_GetCurrentBackBufferIndex(swp_chain_info->swapchain4);
 }
 
 ID3D12Resource *get_swapchain_buffer(struct swapchain_info *swp_chain_info,
@@ -100,9 +95,8 @@ ID3D12Resource *get_swapchain_buffer(struct swapchain_info *swp_chain_info,
 
         HRESULT result;
 
-        result = swp_chain_info->swapchain4->lpVtbl->GetBuffer(
-                swp_chain_info->swapchain4, buffer_index, &IID_ID3D12Resource,
-                &buffer);
+        result = IDXGISwapChain4_GetBuffer(swp_chain_info->swapchain4,
+                buffer_index, &IID_ID3D12Resource, &buffer);
         show_error_if_failed(result);
 
         WCHAR str_buffer_index[1024];
@@ -116,21 +110,18 @@ void present_swapchain(struct swapchain_info *swp_chain_info)
 {
         HRESULT result;
 
-        result = swp_chain_info->swapchain4->lpVtbl->Present(
-                swp_chain_info->swapchain4, 0, 0);
+        result = IDXGISwapChain4_Present(swp_chain_info->swapchain4, 0, 0);
         show_error_if_failed(result);
 
         swp_chain_info->current_buffer_index = 
-                swp_chain_info->swapchain4->lpVtbl->GetCurrentBackBufferIndex(
-                swp_chain_info->swapchain4);
+                IDXGISwapChain4_GetCurrentBackBufferIndex(swp_chain_info->swapchain4);
 }
 
 void release_swapchain(struct swapchain_info *swp_chain_info)
 {
         // Release swapchain
-        swp_chain_info->swapchain4->lpVtbl->Release(
-                swp_chain_info->swapchain4);
+        IDXGISwapChain4_Release(swp_chain_info->swapchain4);
 
         // Release DXGI factory
-        swp_chain_info->factory5->lpVtbl->Release(swp_chain_info->factory5);
+        IDXGIFactory5_Release(swp_chain_info->factory5);
 }

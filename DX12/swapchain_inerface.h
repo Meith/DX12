@@ -3,6 +3,7 @@
 
 #include "gpu_interface.h"
 
+#define COBJMACROS
 #include <dxgi1_5.h>
 
 

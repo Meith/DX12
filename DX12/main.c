@@ -610,7 +610,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 compute_root_param_infos[0].num_descriptors) *
                 sizeof(struct gpu_resource_info));
         
-        for(UINT i = 0; i < swp_chain_info.buffer_count *
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
                 compute_root_param_infos[0].num_descriptors; ++i) {
 
                 create_wstring(compute_cbv_resource_info[i].name,
