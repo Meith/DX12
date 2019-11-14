@@ -72,10 +72,10 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 rtv_resource_info[i].resource = get_swapchain_buffer(
                         &swp_chain_info, i);
                 rtv_resource_info[i].format = swp_chain_info.format;
-                rtv_resource_info[i].current_state = 
+                rtv_resource_info[i].current_state =
                         D3D12_RESOURCE_STATE_PRESENT;
         }
-        
+
         // Create swapchain render target view
         create_rendertarget_view(&device_info, &rtv_descriptor_info,
                 rtv_resource_info);
@@ -102,15 +102,15 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tmp_rtv_resource_info[i].mip_levels = 1;
                 tmp_rtv_resource_info[i].format = swp_chain_info.format;
                 tmp_rtv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-                tmp_rtv_resource_info[i].flags = 
+                tmp_rtv_resource_info[i].flags =
                         D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-                tmp_rtv_resource_info[i].current_state = 
+                tmp_rtv_resource_info[i].current_state =
                         D3D12_RESOURCE_STATE_PRESENT;
                 create_wstring(tmp_rtv_resource_info[i].name,
                         L"TMP RTV Resource %d", i);
-                create_resource(&device_info, &tmp_rtv_resource_info[i]);   
+                create_resource(&device_info, &tmp_rtv_resource_info[i]);
         }
-        
+
         // Create intermediate render target view
         create_rendertarget_view(&device_info, &tmp_rtv_descriptor_info,
                  tmp_rtv_resource_info);
@@ -118,9 +118,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         // Create command allocators for draw commands
         struct gpu_cmd_allocator_info render_cmd_allocator_info;
         create_wstring(render_cmd_allocator_info.name, L"Render Cmd alloc");
-        render_cmd_allocator_info.cmd_list_type = 
+        render_cmd_allocator_info.cmd_list_type =
                 D3D12_COMMAND_LIST_TYPE_DIRECT;
-        render_cmd_allocator_info.cmd_allocator_count = 
+        render_cmd_allocator_info.cmd_allocator_count =
                 swp_chain_info.buffer_count;
         create_cmd_allocators(&device_info, &render_cmd_allocator_info);
 
@@ -142,13 +142,13 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         struct gpu_cmd_list_info copy_cmd_list_info;
         create_wstring(copy_cmd_list_info.name, L"Copy Cmd list");
         copy_cmd_list_info.cmd_list_type = D3D12_COMMAND_LIST_TYPE_COPY;
-        create_cmd_list(&device_info, &copy_cmd_allocator_info, 
+        create_cmd_list(&device_info, &copy_cmd_allocator_info,
                 &copy_cmd_list_info);
 
         // Create command allocators for compute commands
         struct gpu_cmd_allocator_info compute_cmd_allocator_info;
         create_wstring(compute_cmd_allocator_info.name, L"Compute Cmd alloc");
-        compute_cmd_allocator_info.cmd_list_type = 
+        compute_cmd_allocator_info.cmd_list_type =
                 D3D12_COMMAND_LIST_TYPE_COMPUTE;
         compute_cmd_allocator_info.cmd_allocator_count = 2;
         create_cmd_allocators(&device_info, &compute_cmd_allocator_info);
@@ -222,7 +222,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         upload_resources(&vert_upload_resource_info, triangle_mesh.verticies);
 
         // Copy vertex data from upload resource to gpu shader resource
-        rec_copy_buffer_region_cmd(&copy_cmd_list_info, 
+        rec_copy_buffer_region_cmd(&copy_cmd_list_info,
                 &vert_gpu_resource_info, &vert_upload_resource_info);
 
         // Resource for index buffer on the GPU for shader usage
@@ -245,7 +245,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         struct gpu_resource_info indices_upload_resource_info;
         create_wstring(indices_upload_resource_info.name, L"Indices upload resource");
         indices_upload_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
-        indices_upload_resource_info.dimension = 
+        indices_upload_resource_info.dimension =
                 D3D12_RESOURCE_DIMENSION_BUFFER;
         indices_upload_resource_info.width = sizeof (unsigned int) *
                 triangle_mesh.index_count;
@@ -270,7 +270,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
 
         // Signal gpu regarding copy queue work
-        signal_gpu(&copy_queue_info, &fence_info, 
+        signal_gpu(&copy_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
         // Transition gpu vertex shader resource from copy to vertex buffer
@@ -328,7 +328,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         #define ATTRIBUTE_COUNT 3
         LPCSTR attribute_names[ATTRIBUTE_COUNT] = { "POSITION", "COLOR", 
                 "TEXCOORD" };
-        DXGI_FORMAT attribute_formats[ATTRIBUTE_COUNT] = { 
+        DXGI_FORMAT attribute_formats[ATTRIBUTE_COUNT] = {
                 DXGI_FORMAT_R32G32B32A32_FLOAT,
                 DXGI_FORMAT_R32G32B32A32_FLOAT,
                 DXGI_FORMAT_R32G32_FLOAT
@@ -336,22 +336,22 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         struct gpu_vert_input_info vert_input_info;
         vert_input_info.attribute_count = ATTRIBUTE_COUNT;
-        setup_vertex_input(attribute_names, attribute_formats, 
+        setup_vertex_input(attribute_names, attribute_formats,
                 &vert_input_info);
 
         // Create root signature
         struct gpu_root_param_info graphics_root_param_infos[3];
 
-        graphics_root_param_infos[0].range_type = 
+        graphics_root_param_infos[0].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         graphics_root_param_infos[0].num_descriptors = 1;
-        graphics_root_param_infos[0].shader_visbility = 
+        graphics_root_param_infos[0].shader_visbility =
                 D3D12_SHADER_VISIBILITY_VERTEX;
-       
-        graphics_root_param_infos[1].range_type = 
+
+        graphics_root_param_infos[1].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         graphics_root_param_infos[1].num_descriptors = 1;
-        graphics_root_param_infos[1].shader_visbility = 
+        graphics_root_param_infos[1].shader_visbility =
                 D3D12_SHADER_VISIBILITY_PIXEL;
 
         graphics_root_param_infos[2].range_type =
@@ -369,7 +369,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         struct gpu_pso_info graphics_pso_info;
         create_wstring(graphics_pso_info.name, L"Graphics PSO");
         graphics_pso_info.type = PSO_TYPE_GRAPHICS;
-        graphics_pso_info.graphics_pso_info.vert_shader_byte_code = 
+        graphics_pso_info.graphics_pso_info.vert_shader_byte_code =
                 vert_shader_info.shader_byte_code;
         graphics_pso_info.graphics_pso_info.vert_shader_byte_code_len =
                 vert_shader_info.shader_byte_code_len;
@@ -383,9 +383,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         graphics_pso_info.graphics_pso_info.hull_shader_byte_code_len = 0;
         graphics_pso_info.graphics_pso_info.geom_shader_byte_code = NULL;
         graphics_pso_info.graphics_pso_info.geom_shader_byte_code_len = 0;
-        graphics_pso_info.graphics_pso_info.render_target_format = 
+        graphics_pso_info.graphics_pso_info.render_target_format =
                 tmp_rtv_resource_info[swp_chain_info.current_buffer_index].format;
-        graphics_pso_info.graphics_pso_info.depth_target_format = 
+        graphics_pso_info.graphics_pso_info.depth_target_format =
                 dsv_resource_info[swp_chain_info.current_buffer_index].format;
         create_pso(&device_info, &vert_input_info, &graphics_root_sig_info,
                 &graphics_pso_info);
@@ -420,11 +420,11 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         struct gpu_descriptor_info graphics_cbv_srv_uav_descriptor_info;
         create_wstring(graphics_cbv_srv_uav_descriptor_info.name,
                 L"Graphics CBV heap");
-        graphics_cbv_srv_uav_descriptor_info.type = 
+        graphics_cbv_srv_uav_descriptor_info.type =
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        graphics_cbv_srv_uav_descriptor_info.num_descriptors = 
-                swp_chain_info.buffer_count * 
-                (graphics_root_param_infos[0].num_descriptors + 
+        graphics_cbv_srv_uav_descriptor_info.num_descriptors =
+                swp_chain_info.buffer_count *
+                (graphics_root_param_infos[0].num_descriptors +
                 graphics_root_param_infos[1].num_descriptors);
         graphics_cbv_srv_uav_descriptor_info.flags =
                 D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -438,7 +438,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 sizeof (struct gpu_resource_info));
         for (UINT i = 0; i < swp_chain_info.buffer_count *
                 graphics_root_param_infos[0].num_descriptors; ++i) {
-                
                 create_wstring(graphics_cbv_resource_info[i].name,
                         L"Graphics CBV resource %d", i);
                 graphics_cbv_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
@@ -491,13 +490,12 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         // Create texture resource
         struct gpu_resource_info *tex_resource_info;
         tex_resource_info = malloc(
-                (swp_chain_info.buffer_count * 
+                (swp_chain_info.buffer_count *
                 graphics_root_param_infos[1].num_descriptors) *
                 sizeof (struct gpu_resource_info));
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
                 graphics_root_param_infos[1].num_descriptors; ++i) {
-                
                 create_wstring(tex_resource_info[i].name,
                         L"Tex resource %d", i);
                 tex_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
@@ -524,13 +522,12 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         reset_cmd_allocators(&copy_cmd_allocator_info);
 
-        reset_cmd_list(&copy_cmd_allocator_info, &copy_cmd_list_info, 
+        reset_cmd_list(&copy_cmd_allocator_info, &copy_cmd_list_info,
                 swp_chain_info.current_buffer_index);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
                 graphics_root_param_infos[1].num_descriptors; ++i) {
-        
-                rec_copy_texture_region_cmd(&copy_cmd_list_info, 
+                rec_copy_texture_region_cmd(&copy_cmd_list_info,
                         &tex_resource_info[i], &tex_upload_resource_info);
 
                 // Transition texture shader resource to read/write buffer
@@ -545,11 +542,11 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
 
         // Signal GPU for texture upload of copy queue work
-        signal_gpu(&copy_queue_info, &fence_info, 
+        signal_gpu(&copy_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
         // Make sure compute queue which will use the texture waits for it be uploaded
-        wait_for_fence(&compute_queue_info, &fence_info, 
+        wait_for_fence(&compute_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
         // Compile compute shader
@@ -597,7 +594,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         compute_cbv_srv_uav_descriptor_info.num_descriptors =
                 swp_chain_info.buffer_count *
-                (compute_root_param_infos[0].num_descriptors + 
+                (compute_root_param_infos[0].num_descriptors +
                 compute_root_param_infos[1].num_descriptors);
         compute_cbv_srv_uav_descriptor_info.flags =
                 D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -612,7 +609,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         
         for (UINT i = 0; i < swp_chain_info.buffer_count *
                 compute_root_param_infos[0].num_descriptors; ++i) {
-
                 create_wstring(compute_cbv_resource_info[i].name,
                         L"Compute CBV resource %d", i);
                 compute_cbv_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
@@ -641,7 +637,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
                 compute_root_param_infos[1].num_descriptors; ++i) {
-                
                 update_cpu_handle(&compute_cbv_srv_uav_descriptor_info,
                         swp_chain_info.buffer_count * i + 1);
 
@@ -651,7 +646,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &tex_resource_info[i]);
         }
 
-        LONG_PTR wndproc_data[] = { (LONG_PTR) &wnd_info, 
+        LONG_PTR wndproc_data[] = { (LONG_PTR) &wnd_info,
                 (LONG_PTR) &device_info, (LONG_PTR) &present_queue_info,
                 (LONG_PTR) &swp_chain_info, (LONG_PTR) &rtv_descriptor_info,
                 (LONG_PTR) &rtv_resource_info[0], (LONG_PTR) &tmp_rtv_descriptor_info,
@@ -673,7 +668,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &float_sec);
 
                 // Transition texture shader resource to UAV
-                transition_resource(&compute_cmd_list_info, 
+                transition_resource(&compute_cmd_list_info,
                         &tex_resource_info[swp_chain_info.current_buffer_index],
                         D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -690,7 +685,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &compute_cbv_srv_uav_descriptor_info);
 
                 update_gpu_handle(&compute_cbv_srv_uav_descriptor_info, 
-                    swp_chain_info.buffer_count * 
+                    swp_chain_info.buffer_count *
                     swp_chain_info.current_buffer_index);
 
                 // Set constant buffer table
@@ -699,7 +694,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &compute_cbv_srv_uav_descriptor_info);
 
                 update_gpu_handle(&compute_cbv_srv_uav_descriptor_info,
-                        (swp_chain_info.buffer_count * 
+                        (swp_chain_info.buffer_count *
                         swp_chain_info.current_buffer_index) + 1);
 
                 // Set shader resource table
@@ -709,7 +704,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
                 // Call compute dispatch
                 rec_dispatch_cmd(&compute_cmd_list_info, 
-                        (UINT) tex_resource_info[swp_chain_info.current_buffer_index].width / 8, 
+                        (UINT) tex_resource_info[swp_chain_info.current_buffer_index].width / 8,
                         (UINT) tex_resource_info[swp_chain_info.current_buffer_index].height / 8, 1);
 
                 // Close command list for execution
@@ -719,19 +714,19 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 execute_cmd_list(&compute_queue_info, &compute_cmd_list_info);
 
                 // Signal GPU for compute queue's completion
-                signal_gpu(&compute_queue_info, &fence_info, 
+                signal_gpu(&compute_queue_info, &fence_info,
                         swp_chain_info.current_buffer_index);
 
                 // Reder queue needs to wait for compute queue's completion
-                wait_for_fence(&render_queue_info, &fence_info, 
+                wait_for_fence(&render_queue_info, &fence_info,
                         swp_chain_info.current_buffer_index);
 
                 // Transition texture shader resource to read/write buffer
-                transition_resource(&render_cmd_list_info, 
+                transition_resource(&render_cmd_list_info,
                         &tex_resource_info[swp_chain_info.current_buffer_index],
                         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-                update_cpu_handle(&tmp_rtv_descriptor_info, 
+                update_cpu_handle(&tmp_rtv_descriptor_info,
                         swp_chain_info.current_buffer_index);
 
                 transition_resource(&render_cmd_list_info,
@@ -752,18 +747,18 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &dsv_descriptor_info);
 
                 // Set pipeline state
-                rec_set_pipeline_state_cmd(&render_cmd_list_info, 
+                rec_set_pipeline_state_cmd(&render_cmd_list_info,
                         &graphics_pso_info);
 
                 // Set viewport
                 rec_set_viewport_cmd(&render_cmd_list_info, &viewport_info);
 
                 // Set scissor rect
-                rec_set_scissor_rect_cmd(&render_cmd_list_info, 
+                rec_set_scissor_rect_cmd(&render_cmd_list_info,
                         &scissor_rect_info);
 
                 // Set primitve
-                rec_set_primitive_cmd(&render_cmd_list_info, 
+                rec_set_primitive_cmd(&render_cmd_list_info,
                         D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
                 // Set root signature
@@ -775,12 +770,12 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &graphics_cbv_srv_uav_descriptor_info);
 
                 update_gpu_handle(&graphics_cbv_srv_uav_descriptor_info,
-                        swp_chain_info.buffer_count * 
+                        swp_chain_info.buffer_count *
                         swp_chain_info.current_buffer_index);
 
                 // Set constant buffer table
                 rec_set_graphics_root_descriptor_table_cmd(
-                        &render_cmd_list_info, 0, 
+                        &render_cmd_list_info, 0,
                         &graphics_cbv_srv_uav_descriptor_info);
 
                 update_gpu_handle(&graphics_cbv_srv_uav_descriptor_info,
@@ -836,7 +831,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         swp_chain_info.current_buffer_index);
 
                 // Point render target view cpu handle to correct descriptor in descriptor heap
-                update_cpu_handle(&rtv_descriptor_info, 
+                update_cpu_handle(&rtv_descriptor_info,
                         swp_chain_info.current_buffer_index);
 
                 // Transition render target buffer to copy dest state
@@ -870,16 +865,16 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
 
                 // Reset command allocator
-                reset_cmd_allocator(&render_cmd_allocator_info, 
+                reset_cmd_allocator(&render_cmd_allocator_info,
                         swp_chain_info.current_buffer_index);
 
                 // Reset command list
-                reset_cmd_list(&render_cmd_allocator_info, 
+                reset_cmd_list(&render_cmd_allocator_info,
                         &render_cmd_list_info, 
                         swp_chain_info.current_buffer_index);
 
                 // Reset command allocator
-                reset_cmd_allocator(&compute_cmd_allocator_info, 
+                reset_cmd_allocator(&compute_cmd_allocator_info,
                         swp_chain_info.current_buffer_index);
 
                 // Reset command list
@@ -899,7 +894,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         } while (queued_window_msg != WM_QUIT);
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(&present_queue_info, &fence_info, 
+        signal_gpu(&present_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
         wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
@@ -908,7 +903,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 compute_root_param_infos[0].num_descriptors; ++i) {
                 release_resource(&compute_cbv_resource_info[i]);
         }
-        
+
         free(compute_cbv_resource_info);
 
         release_descriptor(&compute_cbv_srv_uav_descriptor_info);

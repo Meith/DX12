@@ -28,7 +28,7 @@ static inline void debug_print(const char *in_str, ...)
 
         char out_str[1024];
         vsprintf(out_str, in_str, arg_list);
-        
+
         OutputDebugString(out_str);
 
         va_end(arg_list);

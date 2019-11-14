@@ -17,9 +17,9 @@ struct window_info {
 void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
         int nCmdShow);
 UINT window_message_loop();
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam, 
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
         LPARAM lparam);
-static void resize_window(struct window_info *wnd_info, 
+static void resize_window(struct window_info *wnd_info,
         struct gpu_device_info *device_info,
         struct gpu_cmd_queue_info *render_queue_info,
         struct swapchain_info *swp_chain_info,

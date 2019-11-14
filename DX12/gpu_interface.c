@@ -17,14 +17,14 @@ void create_gpu_device(struct gpu_device_info *device_info)
 
         // Enable debug layer
         #if defined(_DEBUG)
-        result = D3D12GetDebugInterface(&IID_ID3D12Debug, 
+        result = D3D12GetDebugInterface(&IID_ID3D12Debug,
                 &device_info->debug);
         show_error_if_failed(result);
 
         ID3D12Debug_EnableDebugLayer(device_info->debug);
         #endif
 
-        result = D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0, 
+        result = D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0,
                 &IID_ID3D12Device, &device_info->device);
         show_error_if_failed(result);
 
@@ -73,9 +73,9 @@ void create_resource(struct gpu_device_info *device_info,
 {
         D3D12_HEAP_PROPERTIES heap_properties;
         heap_properties.Type = resource_info->type;
-        heap_properties.CPUPageProperty = 
+        heap_properties.CPUPageProperty =
                 D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heap_properties.MemoryPoolPreference = 
+        heap_properties.MemoryPoolPreference =
                 D3D12_MEMORY_POOL_UNKNOWN;
         heap_properties.CreationNodeMask = 0;
         heap_properties.VisibleNodeMask = 0;
@@ -92,7 +92,7 @@ void create_resource(struct gpu_device_info *device_info,
         resource_desc.SampleDesc.Quality = 0;
         resource_desc.Layout = resource_info->layout;
         resource_desc.Flags = resource_info->flags;
-        
+
         D3D12_CLEAR_VALUE *clear_value_ptr = NULL;
         D3D12_CLEAR_VALUE clear_value;
         clear_value.Format = resource_info->format;
@@ -125,7 +125,7 @@ void create_resource(struct gpu_device_info *device_info,
         show_error_if_failed(result);
 
         if (resource_info->dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-                resource_info->gpu_address = 
+                resource_info->gpu_address =
                         ID3D12Resource_GetGPUVirtualAddress(resource_info->resource);
 
         result = ID3D12Object_SetName(resource_info->resource,
@@ -171,7 +171,7 @@ void create_descriptor(struct gpu_device_info *device_info,
                 &descriptor_info->descriptor_heap);
         show_error_if_failed(result);
 
-        descriptor_info->stride = 
+        descriptor_info->stride =
                 ID3D12Device_GetDescriptorHandleIncrementSize(
                         device_info->device, heap_desc.Type);
 
@@ -197,17 +197,17 @@ void release_descriptor(struct gpu_descriptor_info *descriptor_info)
         ID3D12DescriptorHeap_Release(descriptor_info->descriptor_heap);
 }
 
-void update_cpu_handle(struct gpu_descriptor_info *descriptor_info, 
+void update_cpu_handle(struct gpu_descriptor_info *descriptor_info,
         UINT index)
 {
-        descriptor_info->cpu_handle.ptr = descriptor_info->base_cpu_handle.ptr + 
+        descriptor_info->cpu_handle.ptr = descriptor_info->base_cpu_handle.ptr +
                 index * descriptor_info->stride;
 }
 
 void update_gpu_handle(struct gpu_descriptor_info *descriptor_info, 
         UINT index)
 {
-        descriptor_info->gpu_handle.ptr = descriptor_info->base_gpu_handle.ptr + 
+        descriptor_info->gpu_handle.ptr = descriptor_info->base_gpu_handle.ptr +
                 index * descriptor_info->stride;
 }
 
@@ -243,7 +243,7 @@ void create_depthstencil_view(struct gpu_device_info *device_info,
                 dsv_desc.Flags = D3D12_DSV_FLAG_NONE;
                 dsv_desc.Texture2D.MipSlice = 0;
 
-                descriptor_info->cpu_handle.ptr = 
+                descriptor_info->cpu_handle.ptr =
                         descriptor_info->base_cpu_handle.ptr + i *
                         descriptor_info->stride;
 
@@ -326,13 +326,13 @@ void create_sampler(struct gpu_device_info *device_info,
         sampler_desc.MipLODBias = 0;
         sampler_desc.MaxAnisotropy = 0;
         sampler_desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler_desc.BorderColor[0] = 
+        sampler_desc.BorderColor[0] =
                 D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler_desc.BorderColor[1] = 
+        sampler_desc.BorderColor[1] =
                 D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler_desc.BorderColor[2] = 
+        sampler_desc.BorderColor[2] =
                 D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler_desc.BorderColor[3] = 
+        sampler_desc.BorderColor[3] =
                 D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
         sampler_desc.MinLOD = 0.0f;
         sampler_desc.MaxLOD = D3D12_FLOAT32_MAX;
@@ -354,7 +354,7 @@ void create_cmd_allocators(struct gpu_device_info *device_info,
         for (UINT i = 0; i < cmd_allocator_info->cmd_allocator_count; ++i) {
                 result = ID3D12Device_CreateCommandAllocator(
                         device_info->device, cmd_allocator_info->cmd_list_type,
-                        &IID_ID3D12CommandAllocator, 
+                        &IID_ID3D12CommandAllocator,
                         &cmd_allocator_info->cmd_allocators[i]);
                 show_error_if_failed(result);
 
@@ -388,7 +388,7 @@ void reset_cmd_allocators(struct gpu_cmd_allocator_info *cmd_allocator_info)
         }
 }
 
-void reset_cmd_allocator(struct gpu_cmd_allocator_info *cmd_allocator_info, 
+void reset_cmd_allocator(struct gpu_cmd_allocator_info *cmd_allocator_info,
         UINT index)
 {
         HRESULT result;
@@ -425,16 +425,16 @@ void close_cmd_list(struct gpu_cmd_list_info *cmd_list_info)
         ID3D12GraphicsCommandList_Close(cmd_list_info->cmd_list);
 }
 
-void execute_cmd_list(struct gpu_cmd_queue_info *cmd_queue_info, 
+void execute_cmd_list(struct gpu_cmd_queue_info *cmd_queue_info,
         struct gpu_cmd_list_info *cmd_list_info)
 {
-        ID3D12CommandList *command_lists[] = 
+        ID3D12CommandList *command_lists[] =
                 { (ID3D12CommandList *) cmd_list_info->cmd_list };
         ID3D12CommandQueue_ExecuteCommandLists(cmd_queue_info->cmd_queue,
                 _countof(command_lists), command_lists);
 }
 
-void reset_cmd_list(struct gpu_cmd_allocator_info *cmd_allocator_info, 
+void reset_cmd_list(struct gpu_cmd_allocator_info *cmd_allocator_info,
         struct gpu_cmd_list_info *cmd_list_info, UINT index)
 {
         ID3D12GraphicsCommandList_Reset(cmd_list_info->cmd_list,
@@ -463,11 +463,11 @@ void rec_copy_texture_region_cmd(struct gpu_cmd_list_info *cmd_list_info,
         src_tex_loc.pResource = src_resource_info->resource;
         src_tex_loc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
         src_tex_loc.PlacedFootprint.Offset = 0;
-        src_tex_loc.PlacedFootprint.Footprint.Format = 
+        src_tex_loc.PlacedFootprint.Footprint.Format =
                 dst_resource_info->format;
-        src_tex_loc.PlacedFootprint.Footprint.Width = 
+        src_tex_loc.PlacedFootprint.Footprint.Width =
                 (UINT) dst_resource_info->width;
-        src_tex_loc.PlacedFootprint.Footprint.Height = 
+        src_tex_loc.PlacedFootprint.Footprint.Height =
                 (UINT) dst_resource_info->height;
         src_tex_loc.PlacedFootprint.Footprint.Depth = 1;
         src_tex_loc.PlacedFootprint.Footprint.RowPitch = 
@@ -510,7 +510,7 @@ void rec_set_pipeline_state_cmd(struct gpu_cmd_list_info *cmd_list_info,
                 cmd_list_info->cmd_list, pso_info->pso);
 }
 
-void rec_set_render_target_cmd(struct gpu_cmd_list_info *cmd_list_info, 
+void rec_set_render_target_cmd(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_descriptor_info *rtv_desc_info,
         struct gpu_descriptor_info *dsv_desc_info)
 {
@@ -519,7 +519,7 @@ void rec_set_render_target_cmd(struct gpu_cmd_list_info *cmd_list_info,
                 &dsv_desc_info->cpu_handle);
 }
 
-void rec_set_viewport_cmd(struct gpu_cmd_list_info *cmd_list_info, 
+void rec_set_viewport_cmd(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_viewport_info *viewport_info)
 {
         ID3D12GraphicsCommandList_RSSetViewports(
@@ -562,7 +562,7 @@ void rec_set_descriptor_heap_cmd(struct gpu_cmd_list_info *cmd_list_info,
 }
 
 void rec_set_compute_root_descriptor_table_cmd(
-        struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
+        struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index,
         struct gpu_descriptor_info *descriptor_info)
 {
         ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(
@@ -571,11 +571,11 @@ void rec_set_compute_root_descriptor_table_cmd(
 }
 
 void rec_set_graphics_root_descriptor_table_cmd(
-        struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index, 
+        struct gpu_cmd_list_info *cmd_list_info, UINT root_param_index,
         struct gpu_descriptor_info *descriptor_info)
 {
         ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(
-                cmd_list_info->cmd_list, root_param_index, 
+                cmd_list_info->cmd_list, root_param_index,
                 descriptor_info->gpu_handle);
 }
 
@@ -626,7 +626,7 @@ void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
         resource_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         resource_barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
         resource_barrier.Transition.pResource = resource_info->resource;
-        resource_barrier.Transition.Subresource = 
+        resource_barrier.Transition.Subresource =
                 D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         resource_barrier.Transition.StateBefore = resource_info->current_state;
         resource_barrier.Transition.StateAfter = resource_end_state;
@@ -641,7 +641,7 @@ void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
 void create_fence(struct gpu_device_info *device_info, 
         struct gpu_fence_info *fence_info)
 {
-        fence_info->fence_values = malloc(fence_info->num_fence_value * 
+        fence_info->fence_values = malloc(fence_info->num_fence_value *
                 sizeof (UINT64));
         for (UINT i = 0; i < fence_info->num_fence_value; ++i) {
                 fence_info->fence_values[i] = 0;
@@ -680,7 +680,7 @@ void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
         HRESULT result;
 
         result = cmd_queue_info->cmd_queue->lpVtbl->Signal(
-                cmd_queue_info->cmd_queue, fence_info->fence, 
+                cmd_queue_info->cmd_queue, fence_info->fence,
                 fence_info->fence_values[index]);
 
         show_error_if_failed(result);
@@ -730,8 +730,8 @@ void compile_shader(struct gpu_shader_info *shader_info)
         ID3DBlob *shader_error_blob = NULL;
         shader_info->shader_blob = NULL;
 
-        result = D3DCompileFromFile(shader_info->shader_file, NULL, NULL, 
-                "main", shader_info->shader_target, shader_info->flags, 0, 
+        result = D3DCompileFromFile(shader_info->shader_file, NULL, NULL,
+                "main", shader_info->shader_target, shader_info->flags, 0,
                 &shader_info->shader_blob, &shader_error_blob);
         show_error_if_failed(result);
         assert(shader_error_blob == NULL);
@@ -758,12 +758,12 @@ void setup_vertex_input(LPCSTR *attribute_names, DXGI_FORMAT *attribute_formats,
                 input_info->input_element_descs[i].SemanticName =
                         attribute_names[i];
                 input_info->input_element_descs[i].SemanticIndex = 0;
-                input_info->input_element_descs[i].Format = 
+                input_info->input_element_descs[i].Format =
                         attribute_formats[i];
                 input_info->input_element_descs[i].InputSlot = 0;
-                input_info->input_element_descs[i].AlignedByteOffset = 
+                input_info->input_element_descs[i].AlignedByteOffset =
                         D3D12_APPEND_ALIGNED_ELEMENT;
-                input_info->input_element_descs[i].InputSlotClass = 
+                input_info->input_element_descs[i].InputSlotClass =
                         D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
                 input_info->input_element_descs[i].InstanceDataStepRate = 0;
         }
@@ -779,31 +779,31 @@ void create_root_sig(struct gpu_device_info *device_info,
         struct gpu_root_param_info *root_param_infos, UINT num_root_params,
         struct gpu_root_sig_info *root_sig_info)
 {
-        D3D12_DESCRIPTOR_RANGE *descriptor_ranges = malloc(num_root_params * 
+        D3D12_DESCRIPTOR_RANGE *descriptor_ranges = malloc(num_root_params *
                 sizeof (D3D12_DESCRIPTOR_RANGE));
 
         D3D12_ROOT_PARAMETER *root_params = malloc(num_root_params *
                 sizeof (D3D12_ROOT_PARAMETER));
 
         for (UINT i = 0; i < num_root_params; ++i) {
-                descriptor_ranges[i].RangeType = 
+                descriptor_ranges[i].RangeType =
                         root_param_infos[i].range_type;
-                descriptor_ranges[i].NumDescriptors = 
+                descriptor_ranges[i].NumDescriptors =
                         root_param_infos[i].num_descriptors;
                 descriptor_ranges[i].BaseShaderRegister = 0;
                 descriptor_ranges[i].RegisterSpace = 0;
                 descriptor_ranges[i].OffsetInDescriptorsFromTableStart = 0;
 
-                root_params[i].ParameterType = 
+                root_params[i].ParameterType =
                         D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
                 root_params[i].DescriptorTable.NumDescriptorRanges = 1;
-                root_params[i].DescriptorTable.pDescriptorRanges = 
+                root_params[i].DescriptorTable.pDescriptorRanges =
                         &descriptor_ranges[i];
-                root_params[i].ShaderVisibility = 
+                root_params[i].ShaderVisibility =
                         root_param_infos[i].shader_visbility;
         }
 
-        D3D12_ROOT_SIGNATURE_FLAGS root_sig_flags = 
+        D3D12_ROOT_SIGNATURE_FLAGS root_sig_flags =
                 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
                 D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
                 D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
@@ -821,7 +821,7 @@ void create_root_sig(struct gpu_device_info *device_info,
 
         ID3DBlob *root_sig_error_blob = NULL;
         root_sig_info->root_sig_blob = NULL;
-        result = D3D12SerializeVersionedRootSignature(&root_sig_desc, 
+        result = D3D12SerializeVersionedRootSignature(&root_sig_desc,
                 &root_sig_info->root_sig_blob, &root_sig_error_blob);
         show_error_if_failed(result);
         assert(root_sig_error_blob == NULL);
@@ -858,7 +858,7 @@ void create_pso(struct gpu_device_info *device_info,
         switch(pso_info->type)
         {
                 case PSO_TYPE_GRAPHICS :
-                        create_graphics_pso(device_info, vert_input_info, 
+                        create_graphics_pso(device_info, vert_input_info,
                                 root_sig_info, pso_info);
                         break;
 
@@ -876,31 +876,31 @@ void create_pso(struct gpu_device_info *device_info,
         show_error_if_failed(result);
 }
 
-static void create_graphics_pso(struct gpu_device_info *device_info,   
+static void create_graphics_pso(struct gpu_device_info *device_info,
         struct gpu_vert_input_info *vert_input_info,
         struct gpu_root_sig_info *root_sig_info, struct gpu_pso_info *pso_info)
 {
         D3D12_GRAPHICS_PIPELINE_STATE_DESC graphics_pso_desc;
         graphics_pso_desc.pRootSignature = root_sig_info->root_sig;
-        graphics_pso_desc.VS.pShaderBytecode = 
+        graphics_pso_desc.VS.pShaderBytecode =
                 pso_info->graphics_pso_info.vert_shader_byte_code;
-        graphics_pso_desc.VS.BytecodeLength = 
+        graphics_pso_desc.VS.BytecodeLength =
                 pso_info->graphics_pso_info.vert_shader_byte_code_len;
-        graphics_pso_desc.PS.pShaderBytecode = 
+        graphics_pso_desc.PS.pShaderBytecode =
                 pso_info->graphics_pso_info.pix_shader_byte_code;
-        graphics_pso_desc.PS.BytecodeLength = 
+        graphics_pso_desc.PS.BytecodeLength =
                 pso_info->graphics_pso_info.pix_shader_byte_code_len;
-        graphics_pso_desc.DS.pShaderBytecode = 
+        graphics_pso_desc.DS.pShaderBytecode =
                 pso_info->graphics_pso_info.dom_shader_byte_code;
-        graphics_pso_desc.DS.BytecodeLength = 
+        graphics_pso_desc.DS.BytecodeLength =
                 pso_info->graphics_pso_info.dom_shader_byte_code_len;
-        graphics_pso_desc.HS.pShaderBytecode = 
+        graphics_pso_desc.HS.pShaderBytecode =
                 pso_info->graphics_pso_info.hull_shader_byte_code;
-        graphics_pso_desc.HS.BytecodeLength = 
+        graphics_pso_desc.HS.BytecodeLength =
                 pso_info->graphics_pso_info.hull_shader_byte_code_len;
-        graphics_pso_desc.GS.pShaderBytecode = 
+        graphics_pso_desc.GS.pShaderBytecode =
                 pso_info->graphics_pso_info.geom_shader_byte_code;
-        graphics_pso_desc.GS.BytecodeLength = 
+        graphics_pso_desc.GS.BytecodeLength =
                 pso_info->graphics_pso_info.geom_shader_byte_code_len;
         graphics_pso_desc.StreamOutput.pSODeclaration = NULL;
         graphics_pso_desc.StreamOutput.NumEntries = 0;
@@ -911,21 +911,21 @@ static void create_graphics_pso(struct gpu_device_info *device_info,
         graphics_pso_desc.BlendState.IndependentBlendEnable = FALSE;
         graphics_pso_desc.BlendState.RenderTarget[0].BlendEnable = FALSE;
         graphics_pso_desc.BlendState.RenderTarget[0].LogicOpEnable = FALSE;
-        graphics_pso_desc.BlendState.RenderTarget[0].SrcBlend = 
+        graphics_pso_desc.BlendState.RenderTarget[0].SrcBlend =
                 D3D12_BLEND_ONE;
-        graphics_pso_desc.BlendState.RenderTarget[0].DestBlend = 
+        graphics_pso_desc.BlendState.RenderTarget[0].DestBlend =
                 D3D12_BLEND_ZERO;
-        graphics_pso_desc.BlendState.RenderTarget[0].BlendOp = 
+        graphics_pso_desc.BlendState.RenderTarget[0].BlendOp =
                 D3D12_BLEND_OP_ADD;
-        graphics_pso_desc.BlendState.RenderTarget[0].SrcBlendAlpha = 
+        graphics_pso_desc.BlendState.RenderTarget[0].SrcBlendAlpha =
                 D3D12_BLEND_ONE;
-        graphics_pso_desc.BlendState.RenderTarget[0].DestBlendAlpha = 
+        graphics_pso_desc.BlendState.RenderTarget[0].DestBlendAlpha =
                 D3D12_BLEND_ZERO;
-        graphics_pso_desc.BlendState.RenderTarget[0].BlendOpAlpha = 
+        graphics_pso_desc.BlendState.RenderTarget[0].BlendOpAlpha =
                 D3D12_BLEND_OP_ADD;
-        graphics_pso_desc.BlendState.RenderTarget[0].LogicOp = 
+        graphics_pso_desc.BlendState.RenderTarget[0].LogicOp =
                 D3D12_LOGIC_OP_NOOP;
-        graphics_pso_desc.BlendState.RenderTarget[0].RenderTargetWriteMask = 
+        graphics_pso_desc.BlendState.RenderTarget[0].RenderTargetWriteMask =
                 D3D12_COLOR_WRITE_ENABLE_ALL;
         graphics_pso_desc.SampleMask = UINT_MAX;
         graphics_pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -938,49 +938,49 @@ static void create_graphics_pso(struct gpu_device_info *device_info,
         graphics_pso_desc.RasterizerState.MultisampleEnable = FALSE;
         graphics_pso_desc.RasterizerState.AntialiasedLineEnable = FALSE;
         graphics_pso_desc.RasterizerState.ForcedSampleCount = 0;
-        graphics_pso_desc.RasterizerState.ConservativeRaster = 
+        graphics_pso_desc.RasterizerState.ConservativeRaster =
                 D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
         graphics_pso_desc.DepthStencilState.DepthEnable = TRUE;
-        graphics_pso_desc.DepthStencilState.DepthWriteMask = 
+        graphics_pso_desc.DepthStencilState.DepthWriteMask =
                 D3D12_DEPTH_WRITE_MASK_ALL;
-        graphics_pso_desc.DepthStencilState.DepthFunc = 
+        graphics_pso_desc.DepthStencilState.DepthFunc =
                 D3D12_COMPARISON_FUNC_LESS_EQUAL;
         graphics_pso_desc.DepthStencilState.StencilEnable = FALSE;
-        graphics_pso_desc.DepthStencilState.StencilReadMask = 
+        graphics_pso_desc.DepthStencilState.StencilReadMask =
                 D3D12_DEFAULT_STENCIL_READ_MASK;
-        graphics_pso_desc.DepthStencilState.StencilWriteMask = 
+        graphics_pso_desc.DepthStencilState.StencilWriteMask =
                 D3D12_DEFAULT_STENCIL_WRITE_MASK;
-        graphics_pso_desc.DepthStencilState.FrontFace.StencilFailOp = 
+        graphics_pso_desc.DepthStencilState.FrontFace.StencilFailOp =
                 D3D12_STENCIL_OP_KEEP;
-        graphics_pso_desc.DepthStencilState.FrontFace.StencilDepthFailOp = 
+        graphics_pso_desc.DepthStencilState.FrontFace.StencilDepthFailOp =
                 D3D12_STENCIL_OP_KEEP;
-        graphics_pso_desc.DepthStencilState.FrontFace.StencilPassOp = 
+        graphics_pso_desc.DepthStencilState.FrontFace.StencilPassOp =
                 D3D12_STENCIL_OP_KEEP;
-        graphics_pso_desc.DepthStencilState.FrontFace.StencilFunc = 
+        graphics_pso_desc.DepthStencilState.FrontFace.StencilFunc =
                 D3D12_COMPARISON_FUNC_ALWAYS;
-        graphics_pso_desc.DepthStencilState.BackFace.StencilFailOp = 
+        graphics_pso_desc.DepthStencilState.BackFace.StencilFailOp =
                 D3D12_STENCIL_OP_KEEP;
-        graphics_pso_desc.DepthStencilState.BackFace.StencilDepthFailOp = 
+        graphics_pso_desc.DepthStencilState.BackFace.StencilDepthFailOp =
                 D3D12_STENCIL_OP_KEEP;
-        graphics_pso_desc.DepthStencilState.BackFace.StencilPassOp = 
+        graphics_pso_desc.DepthStencilState.BackFace.StencilPassOp =
                 D3D12_STENCIL_OP_KEEP;
-        graphics_pso_desc.DepthStencilState.BackFace.StencilFunc = 
+        graphics_pso_desc.DepthStencilState.BackFace.StencilFunc =
                 D3D12_COMPARISON_FUNC_ALWAYS;
-        graphics_pso_desc.InputLayout.pInputElementDescs = 
+        graphics_pso_desc.InputLayout.pInputElementDescs =
                 vert_input_info->input_element_descs;
-        graphics_pso_desc.InputLayout.NumElements = 
+        graphics_pso_desc.InputLayout.NumElements =
                 vert_input_info->attribute_count;
-        graphics_pso_desc.IBStripCutValue = 
+        graphics_pso_desc.IBStripCutValue =
                 D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
-        graphics_pso_desc.PrimitiveTopologyType = 
+        graphics_pso_desc.PrimitiveTopologyType =
                 D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         graphics_pso_desc.NumRenderTargets = 1;
-        graphics_pso_desc.RTVFormats[0] = 
+        graphics_pso_desc.RTVFormats[0] =
                 pso_info->graphics_pso_info.render_target_format;
         for (UINT i = 1; i < 8; ++i) {
                 graphics_pso_desc.RTVFormats[i] = DXGI_FORMAT_UNKNOWN;
         }
-        graphics_pso_desc.DSVFormat = 
+        graphics_pso_desc.DSVFormat =
                 pso_info->graphics_pso_info.depth_target_format;
         graphics_pso_desc.SampleDesc.Count = 1;
         graphics_pso_desc.SampleDesc.Quality = 0;
@@ -1002,9 +1002,9 @@ static void create_compute_pso(struct gpu_device_info *device_info,
 {
         D3D12_COMPUTE_PIPELINE_STATE_DESC compute_pso_desc;
         compute_pso_desc.pRootSignature = root_sig_info->root_sig;
-        compute_pso_desc.CS.pShaderBytecode = 
+        compute_pso_desc.CS.pShaderBytecode =
                 pso_info->compute_pso_info.comp_shader_byte_code;
-        compute_pso_desc.CS.BytecodeLength = 
+        compute_pso_desc.CS.BytecodeLength =
                 pso_info->compute_pso_info.comp_shader_byte_code_len;
         compute_pso_desc.NodeMask = 0;
         compute_pso_desc.CachedPSO.pCachedBlob = NULL;

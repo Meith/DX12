@@ -9,7 +9,7 @@ void get_checkerboard_tex(UINT64 width, UINT64 height, struct material_info *mat
         const UINT64 cell_pitch = row_pitch >> 3;
         const UINT64 cell_height = width >> 3;
         const UINT64 texture_size = row_pitch * height;
-        
+
         mat_info->tex_size = texture_size * sizeof(UINT8);
         mat_info->tex = malloc (mat_info->tex_size);
 

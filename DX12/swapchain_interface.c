@@ -29,16 +29,16 @@ void create_swapchain(struct window_info *wnd_info,
         DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullscreen_desc;
         fullscreen_desc.RefreshRate.Numerator = 60;
         fullscreen_desc.RefreshRate.Denominator = 1;
-        fullscreen_desc.ScanlineOrdering = 
+        fullscreen_desc.ScanlineOrdering =
                 DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-        fullscreen_desc.Scaling = 
+        fullscreen_desc.Scaling =
                 DXGI_MODE_SCALING_UNSPECIFIED;
         fullscreen_desc.Windowed = TRUE;
 
         HRESULT result;
 
         // Create a DXGI factory
-        result = CreateDXGIFactory2(0, &IID_IDXGIFactory5, 
+        result = CreateDXGIFactory2(0, &IID_IDXGIFactory5,
                 &swp_chain_info->factory5);
         show_error_if_failed(result);
 

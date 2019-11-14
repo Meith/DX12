@@ -30,12 +30,12 @@ void create_window(struct window_info *wnd_info, HINSTANCE hInstance,
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
         // Create the window
-        wnd_info->hwnd = CreateWindowEx(0, wc.lpszClassName, 
+        wnd_info->hwnd = CreateWindowEx(0, wc.lpszClassName,
                 wnd_info->window_name, WS_OVERLAPPEDWINDOW, wnd_info->x, 
                 wnd_info->y, wnd_info->width, wnd_info->height, NULL, NULL, 
                 hInstance, NULL);
 
-	    assert(wnd_info->hwnd);
+        assert(wnd_info->hwnd);
 
         // Show window
         ShowWindow(wnd_info->hwnd, nCmdShow);
@@ -55,7 +55,7 @@ UINT window_message_loop()
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam, 
         LPARAM lparam)
-{       
+{
         LONG_PTR *wndproc_data = (LONG_PTR *) 
                 GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
@@ -67,16 +67,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
         struct gpu_device_info *device_info = (struct gpu_device_info *) 
                 wndproc_data[1];
 
-        struct gpu_cmd_queue_info *present_queue_info = 
+        struct gpu_cmd_queue_info *present_queue_info =
                 (struct gpu_cmd_queue_info *) wndproc_data[2];
-        
+
         struct swapchain_info *swp_chain_info = (struct swapchain_info *) 
                 wndproc_data[3];
-        
-        struct gpu_descriptor_info *rtv_descriptor_info = 
+
+        struct gpu_descriptor_info *rtv_descriptor_info =
                 (struct gpu_descriptor_info *) wndproc_data[4];
-       
-        struct gpu_resource_info *rtv_resource_info = 
+
+        struct gpu_resource_info *rtv_resource_info =
                 (struct gpu_resource_info *) wndproc_data[5];
 
         struct gpu_descriptor_info *tmp_rtv_descriptor_info =
@@ -84,16 +84,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
 
         struct gpu_resource_info *tmp_rtv_resource_info =
             (struct gpu_resource_info *) wndproc_data[7];
-        
-        struct gpu_fence_info *fence_info = (struct gpu_fence_info *) 
+
+        struct gpu_fence_info *fence_info = (struct gpu_fence_info *)
                 wndproc_data[8];
-        
-        struct gpu_descriptor_info *dsv_descriptor_info = 
+
+        struct gpu_descriptor_info *dsv_descriptor_info =
                 (struct gpu_descriptor_info *) wndproc_data[9];
-       
-        struct gpu_resource_info *dsv_resource_info = 
+
+        struct gpu_resource_info *dsv_resource_info =
                 (struct gpu_resource_info *) wndproc_data[10];
-        
+
         switch (nonqueued_msg)
         {
                 case WM_DESTROY :
@@ -107,22 +107,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
                         resize_window(wnd_info, device_info, present_queue_info,
                                 swp_chain_info, rtv_descriptor_info,
                                 rtv_resource_info, tmp_rtv_descriptor_info,
-                                tmp_rtv_resource_info, fence_info, 
+                                tmp_rtv_resource_info, fence_info,
                                 dsv_descriptor_info, dsv_resource_info);
                         break;
                 }
 
                 default :
                 {
-                        return DefWindowProc(hwnd, nonqueued_msg, wparam, 
+                        return DefWindowProc(hwnd, nonqueued_msg, wparam,
                                 lparam);
                 }
-        }   
+        }
 
         return 0;
 }
 
-static void resize_window(struct window_info *wnd_info, 
+static void resize_window(struct window_info *wnd_info,
         struct gpu_device_info *device_info,
         struct gpu_cmd_queue_info *present_queue_info,
         struct swapchain_info *swp_chain_info,
@@ -140,7 +140,7 @@ static void resize_window(struct window_info *wnd_info,
         wnd_info->height = client_rect.bottom - client_rect.top;
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(present_queue_info, fence_info, 
+        signal_gpu(present_queue_info, fence_info,
                 swp_chain_info->current_buffer_index);
         wait_for_gpu(fence_info, 
                 swp_chain_info->current_buffer_index);
@@ -179,13 +179,13 @@ static void resize_window(struct window_info *wnd_info,
                 tmp_rtv_resource_info[i].mip_levels = 1;
                 tmp_rtv_resource_info[i].format = swp_chain_info->format;
                 tmp_rtv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-                tmp_rtv_resource_info[i].flags = 
+                tmp_rtv_resource_info[i].flags =
                         D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-                tmp_rtv_resource_info[i].current_state = 
+                tmp_rtv_resource_info[i].current_state =
                         D3D12_RESOURCE_STATE_PRESENT;
                 create_wstring(tmp_rtv_resource_info[i].name,
                         L"TMP RTV Resource %d", i);
-                create_resource(device_info, &tmp_rtv_resource_info[i]);   
+                create_resource(device_info, &tmp_rtv_resource_info[i]);
         }
 
         create_rendertarget_view(device_info, tmp_rtv_descriptor_info,
