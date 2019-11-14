@@ -1,6 +1,7 @@
 #include "window_interface.h"
 #include "gpu_interface.h"
 #include "swapchain_inerface.h"
+#include "misc.h"
 
 #include <assert.h>
 
@@ -64,7 +65,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
         struct gpu_device_info *device_info = (struct gpu_device_info *) 
                 wndproc_data[1];
 
-        struct gpu_cmd_queue_info *render_queue_info = 
+        struct gpu_cmd_queue_info *present_queue_info = 
                 (struct gpu_cmd_queue_info *) wndproc_data[2];
         
         struct swapchain_info *swp_chain_info = (struct swapchain_info *) 
@@ -75,15 +76,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
        
         struct gpu_resource_info *rtv_resource_info = 
                 (struct gpu_resource_info *) wndproc_data[5];
+
+        struct gpu_descriptor_info *tmp_rtv_descriptor_info =
+            (struct gpu_descriptor_info *) wndproc_data[6];
+
+        struct gpu_resource_info *tmp_rtv_resource_info =
+            (struct gpu_resource_info *) wndproc_data[7];
         
         struct gpu_fence_info *fence_info = (struct gpu_fence_info *) 
-                wndproc_data[6];
+                wndproc_data[8];
         
         struct gpu_descriptor_info *dsv_descriptor_info = 
-                (struct gpu_descriptor_info *) wndproc_data[7];
+                (struct gpu_descriptor_info *) wndproc_data[9];
        
         struct gpu_resource_info *dsv_resource_info = 
-                (struct gpu_resource_info *) wndproc_data[8];
+                (struct gpu_resource_info *) wndproc_data[10];
         
         switch (nonqueued_msg)
         {
@@ -95,9 +102,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
 
                 case WM_SIZE :
                 {
-                        resize_window(wnd_info, device_info, render_queue_info,
+                        resize_window(wnd_info, device_info, present_queue_info,
                                 swp_chain_info, rtv_descriptor_info,
-                                rtv_resource_info, fence_info, 
+                                rtv_resource_info, tmp_rtv_descriptor_info,
+                                tmp_rtv_resource_info, fence_info, 
                                 dsv_descriptor_info, dsv_resource_info);
                         break;
                 }
@@ -114,10 +122,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
 
 static void resize_window(struct window_info *wnd_info, 
         struct gpu_device_info *device_info,
-        struct gpu_cmd_queue_info *render_queue_info,
+        struct gpu_cmd_queue_info *present_queue_info,
         struct swapchain_info *swp_chain_info,
         struct gpu_descriptor_info *rtv_descriptor_info,
         struct gpu_resource_info *rtv_resource_info,
+        struct gpu_descriptor_info *tmp_rtv_descriptor_info,
+        struct gpu_resource_info *tmp_rtv_resource_info,
         struct gpu_fence_info *fence_info,
         struct gpu_descriptor_info *dsv_descriptor_info,
         struct gpu_resource_info *dsv_resource_info)
@@ -128,7 +138,7 @@ static void resize_window(struct window_info *wnd_info,
         wnd_info->height = client_rect.bottom - client_rect.top;
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(render_queue_info, fence_info, 
+        signal_gpu(present_queue_info, fence_info, 
                 swp_chain_info->current_buffer_index);
         wait_for_gpu(fence_info, 
                 swp_chain_info->current_buffer_index);
@@ -137,7 +147,13 @@ static void resize_window(struct window_info *wnd_info,
                 release_resource(&rtv_resource_info[i]);
         }
 
-        release_resource(dsv_resource_info);
+        for (UINT i = 0; i < tmp_rtv_descriptor_info->num_descriptors; ++i) {
+                release_resource(&tmp_rtv_resource_info[i]);
+        }
+
+        for (UINT i = 0; i < dsv_descriptor_info->num_descriptors; ++i) {
+                release_resource(&dsv_resource_info[i]);
+        }
         
         resize_swapchain(wnd_info, swp_chain_info);
 
@@ -152,11 +168,44 @@ static void resize_window(struct window_info *wnd_info,
         create_rendertarget_view(device_info, rtv_descriptor_info,
                 rtv_resource_info);
 
-        dsv_resource_info->width = wnd_info->width;
-        dsv_resource_info->height = wnd_info->height;
-        create_resource(device_info, dsv_resource_info);
+        for (UINT i = 0; i < tmp_rtv_descriptor_info->num_descriptors; ++i) {
+                tmp_rtv_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                tmp_rtv_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                tmp_rtv_resource_info[i].width = wnd_info->width;
+                tmp_rtv_resource_info[i].height = wnd_info->height;
+                tmp_rtv_resource_info[i].mip_levels = 1;
+                tmp_rtv_resource_info[i].format = swp_chain_info->format;
+                tmp_rtv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+                tmp_rtv_resource_info[i].flags = 
+                        D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                tmp_rtv_resource_info[i].current_state = 
+                        D3D12_RESOURCE_STATE_PRESENT;
+                create_wstring(tmp_rtv_resource_info[i].name,
+                        L"TMP RTV Resource %d", i);
+                create_resource(device_info, &tmp_rtv_resource_info[i]);   
+        }
+
+        create_rendertarget_view(device_info, tmp_rtv_descriptor_info,
+                 tmp_rtv_resource_info);
+
+        for (UINT i = 0; i < dsv_descriptor_info->num_descriptors; ++i) {
+                create_wstring(dsv_resource_info[i].name, L"DSV resource %d");
+                dsv_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                dsv_resource_info[i].dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                dsv_resource_info[i].width = wnd_info->width;
+                dsv_resource_info[i].height = wnd_info->height;
+                dsv_resource_info[i].mip_levels = 0;
+                dsv_resource_info[i].format = DXGI_FORMAT_D32_FLOAT;
+                dsv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+                dsv_resource_info[i].flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+                dsv_resource_info[i].current_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+                create_resource(device_info, &dsv_resource_info[i]);
+        }
+
+        // Create depth buffer view
         create_depthstencil_view(device_info, dsv_descriptor_info,
-                dsv_resource_info);
+                 dsv_resource_info);
 }
 
 void destroy_window(struct window_info *wnd_info, HINSTANCE hInstance)

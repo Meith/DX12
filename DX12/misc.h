@@ -27,7 +27,7 @@ static inline void debug_print(const char *in_str, ...)
         va_start(arg_list, in_str);
 
         char out_str[1024];
-        sprintf(out_str, in_str, arg_list);
+        vsprintf(out_str, in_str, arg_list);
         
         OutputDebugString(out_str);
 
@@ -39,7 +39,7 @@ static inline void create_wstring(WCHAR out_str[1024], LPCWSTR in_str, ...)
     va_list arg_list;
     va_start(arg_list, in_str);
 
-    swprintf(out_str, 1024, in_str, arg_list);
+    vswprintf(out_str, 1024, in_str, arg_list);
 
     va_end(arg_list);
 }

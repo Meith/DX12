@@ -285,27 +285,32 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         struct gpu_descriptor_info dsv_descriptor_info;
         create_wstring(dsv_descriptor_info.name, L"DSV Heap");
         dsv_descriptor_info.type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-        dsv_descriptor_info.num_descriptors = 1;
+        dsv_descriptor_info.num_descriptors = swp_chain_info.buffer_count;
         dsv_descriptor_info.flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         create_descriptor(&device_info, &dsv_descriptor_info);
 
         // Create depth buffer resource
-        struct gpu_resource_info dsv_resource_info;
-        create_wstring(dsv_resource_info.name, L"DSV resource");
-        dsv_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
-        dsv_resource_info.dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        dsv_resource_info.width = wnd_info.width;
-        dsv_resource_info.height = wnd_info.height;
-        dsv_resource_info.mip_levels = 0;
-        dsv_resource_info.format = DXGI_FORMAT_D32_FLOAT;
-        dsv_resource_info.layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        dsv_resource_info.flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        dsv_resource_info.current_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        create_resource(&device_info, &dsv_resource_info);
-        
+        struct gpu_resource_info *dsv_resource_info;
+        dsv_resource_info = malloc(
+                dsv_descriptor_info.num_descriptors *
+                sizeof (struct gpu_resource_info));
+        for (UINT i = 0; i < dsv_descriptor_info.num_descriptors; ++i) {
+                create_wstring(dsv_resource_info[i].name, L"DSV resource %d");
+                dsv_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                dsv_resource_info[i].dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                dsv_resource_info[i].width = wnd_info.width;
+                dsv_resource_info[i].height = wnd_info.height;
+                dsv_resource_info[i].mip_levels = 0;
+                dsv_resource_info[i].format = DXGI_FORMAT_D32_FLOAT;
+                dsv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+                dsv_resource_info[i].flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+                dsv_resource_info[i].current_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+                create_resource(&device_info, &dsv_resource_info[i]);
+        }
+
         // Create depth buffer view
-        create_depthstencil_view(&device_info, &dsv_descriptor_info, 
-                &dsv_resource_info);
+        create_depthstencil_view(&device_info, &dsv_descriptor_info,
+                 dsv_resource_info);
 
         // Compile vertex shader
         struct gpu_shader_info vert_shader_info;
@@ -381,7 +386,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         graphics_pso_info.graphics_pso_info.render_target_format = 
                 tmp_rtv_resource_info[swp_chain_info.current_buffer_index].format;
         graphics_pso_info.graphics_pso_info.depth_target_format = 
-                dsv_resource_info.format;
+                dsv_resource_info[swp_chain_info.current_buffer_index].format;
         create_pso(&device_info, &vert_input_info, &graphics_root_sig_info,
                 &graphics_pso_info);
 
@@ -647,10 +652,11 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         }
 
         LONG_PTR wndproc_data[] = { (LONG_PTR) &wnd_info, 
-                (LONG_PTR) &device_info, (LONG_PTR) &render_queue_info,
+                (LONG_PTR) &device_info, (LONG_PTR) &present_queue_info,
                 (LONG_PTR) &swp_chain_info, (LONG_PTR) &rtv_descriptor_info,
-                (LONG_PTR) rtv_resource_info, (LONG_PTR) &fence_info,
-                (LONG_PTR) &dsv_descriptor_info, (LONG_PTR) &dsv_resource_info
+                (LONG_PTR) &rtv_resource_info[0], (LONG_PTR) &tmp_rtv_descriptor_info,
+                (LONG_PTR) &tmp_rtv_resource_info[0], (LONG_PTR) &fence_info,
+                (LONG_PTR) &dsv_descriptor_info, (LONG_PTR) &dsv_resource_info[0]
         };
         SetWindowLongPtr(wnd_info.hwnd, GWLP_USERDATA, (LONG_PTR) wndproc_data);
 
@@ -952,7 +958,11 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         release_shader(&vert_shader_info);
 
         // Release depth stencil buffer resource
-        release_resource(&dsv_resource_info);
+        for (UINT i = 0; i < dsv_descriptor_info.num_descriptors; ++i) {
+            release_resource(&dsv_resource_info[i]);
+        }
+
+        free(dsv_resource_info);
 
         // Release depth stencl buffer heap
         release_descriptor(&dsv_descriptor_info);

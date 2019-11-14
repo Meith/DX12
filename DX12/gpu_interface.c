@@ -236,15 +236,21 @@ void create_depthstencil_view(struct gpu_device_info *device_info,
         struct gpu_descriptor_info *descriptor_info,
         struct gpu_resource_info *resource_info)
 {
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc;
-        dsv_desc.Format = resource_info->format;
-        dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        dsv_desc.Flags = D3D12_DSV_FLAG_NONE;
-        dsv_desc.Texture2D.MipSlice = 0;
+        for (UINT i = 0; i < descriptor_info->num_descriptors; ++i) {
+                D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc;
+                dsv_desc.Format = resource_info[i].format;
+                dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+                dsv_desc.Flags = D3D12_DSV_FLAG_NONE;
+                dsv_desc.Texture2D.MipSlice = 0;
 
-        ID3D12Device_CreateDepthStencilView(device_info->device,
-                resource_info->resource, &dsv_desc,
-                descriptor_info->cpu_handle);
+                descriptor_info->cpu_handle.ptr = 
+                        descriptor_info->base_cpu_handle.ptr + i *
+                        descriptor_info->stride;
+
+                ID3D12Device_CreateDepthStencilView(device_info->device,
+                        resource_info[i].resource, &dsv_desc,
+                        descriptor_info->cpu_handle);
+        }
 }
 
 void create_constant_buffer_view(struct gpu_device_info *device_info,
@@ -351,6 +357,14 @@ void create_cmd_allocators(struct gpu_device_info *device_info,
                         &IID_ID3D12CommandAllocator, 
                         &cmd_allocator_info->cmd_allocators[i]);
                 show_error_if_failed(result);
+
+                WCHAR name[1024];
+                wcscpy(name, cmd_allocator_info->name);
+                wcscat(name, L" %d");
+                create_wstring(name, name, i);
+                result = ID3D12Object_SetName(
+                        cmd_allocator_info->cmd_allocators[i], name);
+                show_error_if_failed(result);
         }
 }
 
@@ -394,6 +408,10 @@ void create_cmd_list(struct gpu_device_info *device_info,
                 cmd_list_info->cmd_list_type,
                 cmd_allocator_info->cmd_allocators[0], NULL,
                 &IID_ID3D12GraphicsCommandList, &cmd_list_info->cmd_list);
+        show_error_if_failed(result);
+
+        result = ID3D12Object_SetName(
+                cmd_list_info->cmd_list, cmd_list_info->name);
         show_error_if_failed(result);
 }
 
@@ -638,7 +656,8 @@ void create_fence(struct gpu_device_info *device_info,
                 &IID_ID3D12Fence, &fence_info->fence);
         show_error_if_failed(result);
 
-        ID3D12Object_SetName(fence_info->fence, fence_info->name);
+        result = ID3D12Object_SetName(fence_info->fence, fence_info->name);
+        show_error_if_failed(result);
 
         fence_info->fence_event = CreateEvent(NULL, FALSE, FALSE, NULL);
         assert(fence_info->fence_event);
@@ -821,9 +840,8 @@ void create_root_sig(struct gpu_device_info *device_info,
                 &root_sig_info->root_sig);
         show_error_if_failed(result);
 
-        ID3D12Object_SetName(root_sig_info->root_sig, root_sig_info->name);
-
-
+        result = ID3D12Object_SetName(root_sig_info->root_sig, root_sig_info->name);
+        show_error_if_failed(result);
 }
 
 void release_root_sig(struct gpu_root_sig_info *root_sig_info)
@@ -853,7 +871,9 @@ void create_pso(struct gpu_device_info *device_info,
                         break;
         }
 
-        ID3D12Object_SetName(pso_info->pso, pso_info->name);
+        HRESULT result;
+        result = ID3D12Object_SetName(pso_info->pso, pso_info->name);
+        show_error_if_failed(result);
 }
 
 static void create_graphics_pso(struct gpu_device_info *device_info,   

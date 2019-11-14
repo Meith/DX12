@@ -25,6 +25,8 @@ static void resize_window(struct window_info *wnd_info,
         struct swapchain_info *swp_chain_info,
         struct gpu_descriptor_info *rtv_descriptor_info,
         struct gpu_resource_info *rtv_resource_info,
+        struct gpu_descriptor_info *tmp_rtv_descriptor_info,
+        struct gpu_resource_info *tmp_rtv_resource_info,
         struct gpu_fence_info *fence_info,
         struct gpu_descriptor_info *dsv_descriptor_info,
         struct gpu_resource_info *dsv_resource_info);
