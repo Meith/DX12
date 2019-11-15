@@ -618,23 +618,37 @@ void rec_draw_indexed_instance_cmd(struct gpu_cmd_list_info *cmd_list_info,
                 cmd_list_info->cmd_list, index_count, instance_count, 0, 0, 0);
 }
 
-void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
-        struct gpu_resource_info *resource_info,
-        D3D12_RESOURCE_STATES resource_end_state)
+void transition_resources(struct gpu_cmd_list_info *cmd_list_info,
+        struct gpu_resource_info **resource_info_list,
+        D3D12_RESOURCE_STATES *resource_end_state_list, UINT resource_count)
 {
-        D3D12_RESOURCE_BARRIER resource_barrier;
-        resource_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        resource_barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        resource_barrier.Transition.pResource = resource_info->resource;
-        resource_barrier.Transition.Subresource =
-                D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        resource_barrier.Transition.StateBefore = resource_info->current_state;
-        resource_barrier.Transition.StateAfter = resource_end_state;
+        #define MAX_RESC_BARRIERS 2
+        D3D12_RESOURCE_BARRIER resource_barrier[MAX_RESC_BARRIERS];
+        for (UINT i = 0; i < resource_count; ++i) {
+                struct gpu_resource_info *resource_info =
+                        resource_info_list[i];
+                resource_barrier[i].Type =
+                        D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                resource_barrier[i].Flags =
+                        D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                resource_barrier[i].Transition.pResource =
+                        resource_info->resource;
+                resource_barrier[i].Transition.Subresource =
+                        D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                resource_barrier[i].Transition.StateBefore =
+                        resource_info->current_state;
+                resource_barrier[i].Transition.StateAfter =
+                        resource_end_state_list[i];
+        }
 
         ID3D12GraphicsCommandList_ResourceBarrier(
-                cmd_list_info->cmd_list, 1, &resource_barrier);
+                cmd_list_info->cmd_list, resource_count, resource_barrier);
 
-        resource_info->current_state = resource_end_state;
+        for (UINT i = 0; i < resource_count; ++i) {
+                 struct gpu_resource_info *resource_info =
+                        resource_info_list[i];
+                resource_info->current_state = resource_end_state_list[i];
+        }
 }
 
 

@@ -273,13 +273,17 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         signal_gpu(&copy_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
-        // Transition gpu vertex shader resource from copy to vertex buffer
-        transition_resource(&render_cmd_list_info, &vert_gpu_resource_info,
-                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        struct gpu_resource_info *transition_resource_info_list[2];
+        transition_resource_info_list[0] = &vert_gpu_resource_info;
+        transition_resource_info_list[1] = &indices_gpu_resource_info;
 
-        // Transition gpu index shader resource from copy to index buffer
-        transition_resource(&render_cmd_list_info, &indices_gpu_resource_info,
-                D3D12_RESOURCE_STATE_INDEX_BUFFER);
+        D3D12_RESOURCE_STATES transition_resource_states_list[2];
+        transition_resource_states_list[0] =
+                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        transition_resource_states_list[1] = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+
+        transition_resources(&render_cmd_list_info, transition_resource_info_list,
+                transition_resource_states_list, 2);
 
         // Create depth buffer descriptor 
         struct gpu_descriptor_info dsv_descriptor_info;
@@ -530,10 +534,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 rec_copy_texture_region_cmd(&copy_cmd_list_info,
                         &tex_resource_info[i], &tex_upload_resource_info);
 
-                // Transition texture shader resource to read/write buffer
-                transition_resource(&copy_cmd_list_info, &tex_resource_info[i],
-                        D3D12_RESOURCE_STATE_COMMON);
+                transition_resource_info_list[i] = &tex_resource_info[i];
+                transition_resource_states_list[i] = D3D12_RESOURCE_STATE_COMMON;
         }
+
+        // Transition texture shader resource to read/write buffer
+        transition_resources(&copy_cmd_list_info, transition_resource_info_list,
+                transition_resource_states_list, swp_chain_info.buffer_count *
+                graphics_root_param_infos[1].num_descriptors);
 
         // Close command list for execution
         close_cmd_list(&copy_cmd_list_info);
@@ -668,9 +676,15 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &float_sec);
 
                 // Transition texture shader resource to UAV
-                transition_resource(&compute_cmd_list_info,
-                        &tex_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                transition_resource_info_list[0] =
+                        &tex_resource_info[swp_chain_info.current_buffer_index];
+
+                transition_resource_states_list[0] =
+                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+                transition_resources(&compute_cmd_list_info,
+                        transition_resource_info_list,
+                        transition_resource_states_list, 1);
 
                 // Set pipeline state
                 rec_set_pipeline_state_cmd(&compute_cmd_list_info,
@@ -705,7 +719,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 // Call compute dispatch
                 rec_dispatch_cmd(&compute_cmd_list_info, 
                         (UINT) tex_resource_info[swp_chain_info.current_buffer_index].width / 8,
-                        (UINT) tex_resource_info[swp_chain_info.current_buffer_index].height / 8, 1);
+                        (UINT) tex_resource_info[swp_chain_info.current_buffer_index].height / 8,
+                        1);
 
                 // Close command list for execution
                 close_cmd_list(&compute_cmd_list_info);
@@ -721,17 +736,22 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 wait_for_fence(&render_queue_info, &fence_info,
                         swp_chain_info.current_buffer_index);
 
-                // Transition texture shader resource to read/write buffer
-                transition_resource(&render_cmd_list_info,
-                        &tex_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                transition_resource_info_list[0] =
+                        &tex_resource_info[swp_chain_info.current_buffer_index];
+                transition_resource_info_list[1] =
+                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index];
+
+                transition_resource_states_list[0] =
+                        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+                transition_resource_states_list[1] =
+                        D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+                transition_resources(&render_cmd_list_info,
+                        transition_resource_info_list,
+                        transition_resource_states_list, 2);
 
                 update_cpu_handle(&tmp_rtv_descriptor_info,
                         swp_chain_info.current_buffer_index);
-
-                transition_resource(&render_cmd_list_info,
-                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_RENDER_TARGET);
 
                 // Set the render target and depth target
                 rec_set_render_target_cmd(&render_cmd_list_info, 
@@ -808,13 +828,18 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 rec_draw_indexed_instance_cmd(&render_cmd_list_info,
                         triangle_mesh.index_count, 1);
 
-                transition_resource(&render_cmd_list_info,
-                        &tex_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_COMMON);
+                transition_resource_info_list[0] =
+                        &tex_resource_info[swp_chain_info.current_buffer_index];
+                transition_resource_info_list[1] =
+                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index];
 
-                transition_resource(&render_cmd_list_info,
-                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_COPY_SOURCE);
+                transition_resource_states_list[0] = D3D12_RESOURCE_STATE_COMMON;
+                transition_resource_states_list[1] =
+                        D3D12_RESOURCE_STATE_COPY_SOURCE;
+
+                transition_resources(&render_cmd_list_info,
+                        transition_resource_info_list,
+                        transition_resource_states_list, 2);
 
                 // Close command list for execution
                 close_cmd_list(&render_cmd_list_info);
@@ -835,18 +860,30 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         swp_chain_info.current_buffer_index);
 
                 // Transition render target buffer to copy dest state
-                transition_resource(&present_cmd_list_info,
-                        &rtv_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_COPY_DEST);
+                transition_resource_info_list[0] =
+                        &rtv_resource_info[swp_chain_info.current_buffer_index];
+
+                transition_resource_states_list[0] =
+                        D3D12_RESOURCE_STATE_COPY_DEST;
+
+                transition_resources(&present_cmd_list_info,
+                        transition_resource_info_list,
+                        transition_resource_states_list, 1);
 
                 rec_copy_resource_cmd(&present_cmd_list_info,
                         &rtv_resource_info[swp_chain_info.current_buffer_index],
                         &tmp_rtv_resource_info[swp_chain_info.current_buffer_index]);
 
                 // Transition render target buffer to present state
-                transition_resource(&present_cmd_list_info,
-                        &rtv_resource_info[swp_chain_info.current_buffer_index],
-                        D3D12_RESOURCE_STATE_PRESENT);
+                transition_resource_info_list[0] =
+                        &rtv_resource_info[swp_chain_info.current_buffer_index];
+
+                transition_resource_states_list[0] =
+                        D3D12_RESOURCE_STATE_PRESENT;
+
+                transition_resources(&present_cmd_list_info,
+                        transition_resource_info_list,
+                        transition_resource_states_list, 1);
 
                 // Close command list for execution
                 close_cmd_list(&present_cmd_list_info);

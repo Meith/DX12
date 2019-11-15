@@ -163,9 +163,9 @@ void rec_dispatch_cmd(struct gpu_cmd_list_info *cmd_list_info,
         UINT thread_group_coun_z);
 void rec_draw_indexed_instance_cmd(struct gpu_cmd_list_info *cmd_list_info,
         UINT index_count, UINT instance_count);
-void transition_resource(struct gpu_cmd_list_info *cmd_list_info,
-        struct gpu_resource_info *resource_info,
-        D3D12_RESOURCE_STATES resource_end_state);
+void transition_resources(struct gpu_cmd_list_info *cmd_list_info,
+        struct gpu_resource_info **resource_info_list,
+        D3D12_RESOURCE_STATES *resource_end_state_list, UINT resource_count);
 
 
 struct gpu_fence_info {
