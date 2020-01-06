@@ -42,6 +42,9 @@
     <ClCompile Include="material_interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gltf_interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="linmath.h">
@@ -69,6 +72,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="camera_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\cgltf\cgltf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gltf_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -6,6 +6,7 @@
 #include "material_interface.h"
 #include "error.h"
 #include "misc.h"
+#include "gltf_interface.h"
 
 
 int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
@@ -181,6 +182,11 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         create_wstring(fence_info.name, L"Fence");
         fence_info.num_fence_value = swp_chain_info.buffer_count;
         create_fence(&device_info, &fence_info);
+
+        // GLTF
+        struct gltf_interface_info gltf_info;
+        gltf_info.file_name = "media\\buster_drone\\busterDrone.gltf";
+        create_gltf(&gltf_info);
 
         // Create triangle mesh
         struct mesh_info triangle_mesh;

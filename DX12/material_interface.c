@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+
 void get_checkerboard_tex(UINT64 width, UINT64 height, struct material_info *mat_info)
 {
         const UINT64 texture_pixel_size = 4;
