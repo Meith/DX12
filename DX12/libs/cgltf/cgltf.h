@@ -154,6 +154,7 @@ typedef enum cgltf_component_type
 	cgltf_component_type_r_8u, /* UNSIGNED_BYTE */
 	cgltf_component_type_r_16, /* SHORT */
 	cgltf_component_type_r_16u, /* UNSIGNED_SHORT */
+	cgltf_component_type_r_32, /* INT */
 	cgltf_component_type_r_32u, /* UNSIGNED_INT */
 	cgltf_component_type_r_32f, /* FLOAT */
 } cgltf_component_type;
@@ -1595,6 +1596,8 @@ static cgltf_size cgltf_component_read_index(const void* in, cgltf_component_typ
 			return *((const int16_t*) in);
 		case cgltf_component_type_r_16u:
 			return *((const uint16_t*) in);
+		case cgltf_component_type_r_32:
+			return *((const int32_t*) in);
 		case cgltf_component_type_r_32u:
 			return *((const uint32_t*) in);
 		case cgltf_component_type_r_32f:
@@ -2240,6 +2243,8 @@ static cgltf_component_type cgltf_json_to_component_type(jsmntok_t const* tok, c
 		return cgltf_component_type_r_16;
 	case 5123:
 		return cgltf_component_type_r_16u;
+	case 5124:
+		return cgltf_component_type_r_32;
 	case 5125:
 		return cgltf_component_type_r_32u;
 	case 5126:
@@ -4179,6 +4184,7 @@ static cgltf_size cgltf_component_size(cgltf_component_type component_type) {
 	case cgltf_component_type_r_16:
 	case cgltf_component_type_r_16u:
 		return 2;
+	case cgltf_component_type_r_32:
 	case cgltf_component_type_r_32u:
 	case cgltf_component_type_r_32f:
 		return 4;

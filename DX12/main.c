@@ -184,9 +184,10 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         create_fence(&device_info, &fence_info);
 
         // GLTF
-        struct gltf_interface_info gltf_info;
-        gltf_info.file_name = "media\\buster_drone\\busterDrone.gltf";
-        create_gltf(&gltf_info);
+        struct gltf_file_info gltf_file_data;
+        gltf_file_data.file_name = "media\\buster_drone\\busterDrone.gltf";
+        struct gltf_gpu_info gltf_gpu_data;
+        create_gltf(&gltf_file_data, &gltf_gpu_data);
 
         // Create triangle mesh
         struct mesh_info triangle_mesh;
