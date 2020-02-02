@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdio.h>
 
+#pragma comment (lib, "dxgi.lib")
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "dxguid.lib")
 #pragma comment (lib, "d3dcompiler.lib")
@@ -24,7 +25,42 @@ void create_gpu_device(struct gpu_device_info *device_info)
         ID3D12Debug_EnableDebugLayer(device_info->debug);
         #endif
 
-        result = D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0,
+        // Create a DXGI factory
+        result = CreateDXGIFactory2(0, &IID_IDXGIFactory5,
+                &device_info->factory5);
+        show_error_if_failed(result);
+
+        IDXGIAdapter1 *adapter1;
+        for (UINT i = 0;
+                DXGI_ERROR_NOT_FOUND !=
+                IDXGIFactory5_EnumAdapters1(device_info->factory5,
+                        i, &adapter1);
+                ++i)
+        {
+                DXGI_ADAPTER_DESC1 desc1;
+                result = IDXGIAdapter1_GetDesc1(adapter1, &desc1);
+                show_error_if_failed(result);
+
+                if (desc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+                {
+                        // Don't select the Basic Render Driver adapter.
+                        continue;
+                }
+
+                // Check to see if the adapter supports Direct3D 12, but don't create the
+                // actual device yet.
+                if (SUCCEEDED(D3D12CreateDevice((IUnknown *) adapter1,
+                        D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, NULL)))
+                {
+                    break;
+                }
+
+                adapter1 = NULL;
+        }
+
+        assert(adapter1 != NULL);
+        IUnknown *final_adapter = (IUnknown *)adapter1;
+        result = D3D12CreateDevice(final_adapter, D3D_FEATURE_LEVEL_11_0,
                 &IID_ID3D12Device, &device_info->device);
         show_error_if_failed(result);
 
@@ -35,6 +71,9 @@ void create_gpu_device(struct gpu_device_info *device_info)
 void release_gpu_device(struct gpu_device_info *device_info)
 {
         ID3D12Device_Release(device_info->device);
+
+        // Release DXGI factory
+        IDXGIFactory5_Release(device_info->factory5);
 
         #if defined(_DEBUG)
         ID3D12Debug_Release(device_info->debug);

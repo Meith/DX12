@@ -3,19 +3,16 @@
 
 #include "gpu_interface.h"
 
-#define COBJMACROS
-#include <dxgi1_5.h>
-
 
 struct swapchain_info {
         DXGI_FORMAT format;
         UINT buffer_count;
         UINT current_buffer_index;
-        IDXGIFactory5 *factory5;
         IDXGISwapChain4 *swapchain4;
 };
 
 void create_swapchain(struct window_info *wnd_info,
+        struct gpu_device_info *device_info,
         struct gpu_cmd_queue_info *cmd_queue_info,
         struct swapchain_info *swp_chain_info);
 void resize_swapchain(struct window_info *wnd_info,

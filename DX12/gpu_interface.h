@@ -3,13 +3,13 @@
 
 #define COBJMACROS
 
-// Including modified d3d12.h since their c interface is broken
-#include "d3d12.h"
+#include <dxgi1_6.h>
+#include "d3d12.h" // Including modified d3d12.h since their c interface is broken
 #include <d3dcompiler.h>
-
 
 struct gpu_device_info {
         ID3D12Debug *debug;
+        IDXGIFactory5 *factory5;
         ID3D12Device *device;
 };
 

@@ -6,7 +6,8 @@
 #pragma comment (lib, "dxgi.lib")
 
 
-void create_swapchain(struct window_info *wnd_info, 
+void create_swapchain(struct window_info *wnd_info,
+        struct gpu_device_info *device_info,
         struct gpu_cmd_queue_info *cmd_queue_info,
         struct swapchain_info *swp_chain_info)
 {
@@ -37,19 +38,14 @@ void create_swapchain(struct window_info *wnd_info,
 
         HRESULT result;
 
-        // Create a DXGI factory
-        result = CreateDXGIFactory2(0, &IID_IDXGIFactory5,
-                &swp_chain_info->factory5);
-        show_error_if_failed(result);
-
         // Create swapchain
         IDXGISwapChain1 *swapchain1;
-        result = IDXGIFactory5_CreateSwapChainForHwnd(swp_chain_info->factory5,
+        result = IDXGIFactory5_CreateSwapChainForHwnd(device_info->factory5,
                 (IUnknown *) cmd_queue_info->cmd_queue, wnd_info->hwnd, 
                 &desc1, &fullscreen_desc, NULL, &swapchain1);
         show_error_if_failed(result);
 
-        result = IDXGIFactory5_QueryInterface(swapchain1,&IID_IDXGISwapChain4,
+        result = IDXGIFactory5_QueryInterface(swapchain1, &IID_IDXGISwapChain4,
                 &swp_chain_info->swapchain4);
         show_error_if_failed(result);
 
@@ -121,7 +117,4 @@ void release_swapchain(struct swapchain_info *swp_chain_info)
 {
         // Release swapchain
         IDXGISwapChain4_Release(swp_chain_info->swapchain4);
-
-        // Release DXGI factory
-        IDXGIFactory5_Release(swp_chain_info->factory5);
 }

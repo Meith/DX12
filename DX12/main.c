@@ -52,7 +52,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         struct swapchain_info swp_chain_info;
         swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swp_chain_info.buffer_count = 2;
-        create_swapchain(&wnd_info, &present_queue_info, &swp_chain_info);
+        create_swapchain(&wnd_info, &device_info, &present_queue_info,
+                &swp_chain_info);
 
         // Create swapchain render target descriptor
         struct gpu_descriptor_info rtv_descriptor_info;
