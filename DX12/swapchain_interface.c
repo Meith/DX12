@@ -45,11 +45,11 @@ void create_swapchain(struct window_info *wnd_info,
                 &desc1, &fullscreen_desc, NULL, &swapchain1);
         show_error_if_failed(result);
 
-        result = IDXGIFactory5_QueryInterface(swapchain1, &IID_IDXGISwapChain4,
+        result = IDXGISwapChain1_QueryInterface(swapchain1, &IID_IDXGISwapChain4,
                 &swp_chain_info->swapchain4);
         show_error_if_failed(result);
 
-        IDXGIFactory5_Release(swapchain1);
+        IDXGISwapChain1_Release(swapchain1);
 
         swp_chain_info->current_buffer_index = 
                 IDXGISwapChain4_GetCurrentBackBufferIndex(swp_chain_info->swapchain4);
