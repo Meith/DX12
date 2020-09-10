@@ -3,6 +3,7 @@
 
 #include "linmath.h"
 
+
 struct camera_info {
         mat4x4 view_mat;
         mat4x4 projection_mat;

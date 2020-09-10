@@ -5,14 +5,12 @@ cbuffer per_frame_const_buffers : register(b0)
 
 struct vertex_input
 {
-        float4 position : POSITION;
-        float4 colour   : COLOR;
+        float3 position : POSITION;
         float2 uv       : TEXCOORD;
 };
 
 struct vertex_output
 {
-        float4 colour   : COLOR;
         float2 uv       : TEXCOORD;
         float4 position : SV_POSITION;
 };
@@ -20,9 +18,8 @@ struct vertex_output
 vertex_output main(vertex_input vi)
 {
         vertex_output vo;
-        vo.colour = vi.colour;
         vo.uv = vi.uv;
-        vo.position = mul(mvp, vi.position);
+        vo.position = mul(mvp, float4(vi.position, 1.0f));
 
         return vo;
 }

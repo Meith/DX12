@@ -50,7 +50,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Create swapchain
         struct swapchain_info swp_chain_info;
-        swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        swp_chain_info.format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         swp_chain_info.buffer_count = 2;
         create_swapchain(&wnd_info, &device_info, &present_queue_info,
                 &swp_chain_info);
@@ -78,8 +78,10 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         }
 
         // Create swapchain render target view
+        struct gpu_view_info rtv_view_info;
+        rtv_view_info.rtv_dimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         create_rendertarget_view(&device_info, &rtv_descriptor_info,
-                rtv_resource_info);
+                rtv_resource_info, &rtv_view_info);
 
         // Create intermediate render target descriptor
         struct gpu_descriptor_info tmp_rtv_descriptor_info;
@@ -104,17 +106,20 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tmp_rtv_resource_info[i].format = swp_chain_info.format;
                 tmp_rtv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
                 tmp_rtv_resource_info[i].flags =
-                        D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                        D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                 tmp_rtv_resource_info[i].current_state =
-                        D3D12_RESOURCE_STATE_PRESENT;
+                        D3D12_RESOURCE_STATE_RENDER_TARGET;
                 create_wstring(tmp_rtv_resource_info[i].name,
                         L"TMP RTV Resource %d", i);
                 create_resource(&device_info, &tmp_rtv_resource_info[i]);
         }
 
         // Create intermediate render target view
+        struct gpu_view_info tmp_rtv_view_info;
+        tmp_rtv_view_info.rtv_dimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         create_rendertarget_view(&device_info, &tmp_rtv_descriptor_info,
-                 tmp_rtv_resource_info);
+                 tmp_rtv_resource_info, &tmp_rtv_view_info);
 
         // Create command allocators for draw commands
         struct gpu_cmd_allocator_info render_cmd_allocator_info;
@@ -193,14 +198,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         create_wstring(vert_gpu_resource_info.name, L"Vert GPU resource");
         vert_gpu_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
         vert_gpu_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        vert_gpu_resource_info.width = sizeof (struct vertex) *
+        vert_gpu_resource_info.width = triangle_mesh.stride *
                 triangle_mesh.vertex_count;
         vert_gpu_resource_info.height = 1;
         vert_gpu_resource_info.mip_levels = 1;
         vert_gpu_resource_info.format = DXGI_FORMAT_UNKNOWN;
         vert_gpu_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         vert_gpu_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
-        vert_gpu_resource_info.current_state = D3D12_RESOURCE_STATE_COPY_DEST;
+        vert_gpu_resource_info.current_state = D3D12_RESOURCE_STATE_COMMON;
         create_resource(&device_info, &vert_gpu_resource_info);
 
         // Resource for uploading vertices from CPU to GPU
@@ -239,7 +244,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         indices_gpu_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         indices_gpu_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
         indices_gpu_resource_info.current_state =
-                D3D12_RESOURCE_STATE_COPY_DEST;
+                D3D12_RESOURCE_STATE_COMMON;
         create_resource(&device_info, &indices_gpu_resource_info);
 
         // Resource for uploading indices from CPU to GPU
@@ -263,28 +268,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         rec_copy_buffer_region_cmd(&copy_cmd_list_info,
                 &indices_gpu_resource_info, &indices_upload_resource_info);
-
-        // Close command list for execution
-        close_cmd_list(&copy_cmd_list_info);
-
-        // Exexute command list
-        execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
-
-        // Signal gpu regarding copy queue work
-        signal_gpu(&copy_queue_info, &fence_info,
-                swp_chain_info.current_buffer_index);
-
-        struct gpu_resource_info *transition_resource_info_list[2];
-        transition_resource_info_list[0] = &vert_gpu_resource_info;
-        transition_resource_info_list[1] = &indices_gpu_resource_info;
-
-        D3D12_RESOURCE_STATES transition_resource_states_list[2];
-        transition_resource_states_list[0] =
-                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-        transition_resource_states_list[1] = D3D12_RESOURCE_STATE_INDEX_BUFFER;
-
-        transition_resources(&render_cmd_list_info, transition_resource_info_list,
-                transition_resource_states_list, 2);
 
         // Create depth buffer descriptor 
         struct gpu_descriptor_info dsv_descriptor_info;
@@ -314,28 +297,28 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         }
 
         // Create depth buffer view
+        struct gpu_view_info dsv_view_info;
+        dsv_view_info.dsv_dimension = D3D12_DSV_DIMENSION_TEXTURE2D;
         create_depthstencil_view(&device_info, &dsv_descriptor_info,
-                 dsv_resource_info);
+                 dsv_resource_info, &dsv_view_info);
 
         // Compile vertex shader
         struct gpu_shader_info vert_shader_info;
         vert_shader_info.shader_file = L"shaders\\tri_vert_shader.hlsl";
-        vert_shader_info.shader_target = "vs_5_1";
+        vert_shader_info.shader_target = "vs_6_5";
         compile_shader(&vert_shader_info);
 
         // Compile pixel shader
         struct gpu_shader_info pix_shader_info;
         pix_shader_info.shader_file = L"shaders\\tri_pix_shader.hlsl";
-        pix_shader_info.shader_target = "ps_5_1";
+        pix_shader_info.shader_target = "ps_6_5";
         compile_shader(&pix_shader_info);
 
         // Setup vertex input layout
-        #define ATTRIBUTE_COUNT 3
-        LPCSTR attribute_names[ATTRIBUTE_COUNT] = { "POSITION", "COLOR", 
-                "TEXCOORD" };
+        #define ATTRIBUTE_COUNT 2
+        LPCSTR attribute_names[ATTRIBUTE_COUNT] = { "POSITION", "TEXCOORD" };
         DXGI_FORMAT attribute_formats[ATTRIBUTE_COUNT] = {
-                DXGI_FORMAT_R32G32B32A32_FLOAT,
-                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                triangle_mesh.vertex_pos_format,
                 DXGI_FORMAT_R32G32_FLOAT
         };
 
@@ -345,29 +328,35 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 &vert_input_info);
 
         // Create root signature
-        struct gpu_root_param_info graphics_root_param_infos[3];
+        #define NUM_GRAPHICS_ROOT_PARAM 3
+        struct gpu_root_param_info graphics_root_param_infos[NUM_GRAPHICS_ROOT_PARAM];
 
-        graphics_root_param_infos[0].range_type =
+        // Layout of root sig
+        #define CBV_GRAPHICS_ROOT_PARAM_INDEX 0
+        #define SRV_GRAPHICS_ROOT_PARAM_INDEX 1
+        #define SAMPLER_GRAPHICS_ROOT_PARAM_INDEX 2
+
+        graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        graphics_root_param_infos[0].num_descriptors = 1;
-        graphics_root_param_infos[0].shader_visbility =
+        graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
+        graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_VERTEX;
 
-        graphics_root_param_infos[1].range_type =
+        graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        graphics_root_param_infos[1].num_descriptors = 1;
-        graphics_root_param_infos[1].shader_visbility =
+        graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
+        graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_PIXEL;
 
-        graphics_root_param_infos[2].range_type =
+        graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-        graphics_root_param_infos[2].num_descriptors = 1;
-        graphics_root_param_infos[2].shader_visbility =
+        graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
+        graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_PIXEL;
 
         struct gpu_root_sig_info graphics_root_sig_info;
         create_wstring(graphics_root_sig_info.name, L"Graphics Root sig");
-        create_root_sig(&device_info, graphics_root_param_infos, 3,
+        create_root_sig(&device_info, graphics_root_param_infos, NUM_GRAPHICS_ROOT_PARAM,
                 &graphics_root_sig_info);
 
         // Create graphics pipeline state object
@@ -410,11 +399,12 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         calc_pv_mat(&cam_info);
 
         // Create sampler descriptor
+        // Do I need two samplers, one for each frame? I don't know.
         struct gpu_descriptor_info sampler_descriptor_info;
         create_wstring(sampler_descriptor_info.name, L"Sampler heap");
         sampler_descriptor_info.type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
         sampler_descriptor_info.num_descriptors =
-                graphics_root_param_infos[2].num_descriptors;
+                graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
         sampler_descriptor_info.flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         create_descriptor(&device_info, &sampler_descriptor_info);
 
@@ -422,31 +412,34 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         create_sampler(&device_info, &sampler_descriptor_info);
 
         // Create constant buffer and texture resource descriptor
+        UINT num_graphics_cbv_srv_uav_descriptors = graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors +
+                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
         struct gpu_descriptor_info graphics_cbv_srv_uav_descriptor_info;
         create_wstring(graphics_cbv_srv_uav_descriptor_info.name,
-                L"Graphics CBV heap");
+                L"Graphics CBV SRV UAV heap");
         graphics_cbv_srv_uav_descriptor_info.type =
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         graphics_cbv_srv_uav_descriptor_info.num_descriptors =
-                swp_chain_info.buffer_count *
-                (graphics_root_param_infos[0].num_descriptors +
-                graphics_root_param_infos[1].num_descriptors);
+                swp_chain_info.buffer_count * num_graphics_cbv_srv_uav_descriptors;
         graphics_cbv_srv_uav_descriptor_info.flags =
                 D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         create_descriptor(&device_info, &graphics_cbv_srv_uav_descriptor_info);
 
+        #define CBV_GRAPHICS_DESCRIPTOR_INDEX 0
+        #define SRV_GRAPHICS_DESCRIPTOR_INDEX 1
+
         // Create constant buffer resource
         struct gpu_resource_info *graphics_cbv_resource_info;
-        graphics_cbv_resource_info = malloc(
-                (swp_chain_info.buffer_count * 
-                graphics_root_param_infos[0].num_descriptors) *
+        graphics_cbv_resource_info = malloc(swp_chain_info.buffer_count *
+                graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors *
                 sizeof (struct gpu_resource_info));
         for (UINT i = 0; i < swp_chain_info.buffer_count *
                 graphics_root_param_infos[0].num_descriptors; ++i) {
                 create_wstring(graphics_cbv_resource_info[i].name,
                         L"Graphics CBV resource %d", i);
                 graphics_cbv_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
-                graphics_cbv_resource_info[i].dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+                graphics_cbv_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
                 graphics_cbv_resource_info[i].width =
                         align_offset(sizeof (cam_info.pv_mat), 256);
                 graphics_cbv_resource_info[i].height = 1;
@@ -462,7 +455,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 upload_resources(&graphics_cbv_resource_info[i], cam_info.pv_mat);
 
                 update_cpu_handle(&graphics_cbv_srv_uav_descriptor_info,
-                        swp_chain_info.buffer_count * i);
+                        num_graphics_cbv_srv_uav_descriptors * i + CBV_GRAPHICS_DESCRIPTOR_INDEX); // 0, 2
 
                 // Create constant buffer view
                 create_constant_buffer_view(&device_info,
@@ -494,13 +487,12 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Create texture resource
         struct gpu_resource_info *tex_resource_info;
-        tex_resource_info = malloc(
-                (swp_chain_info.buffer_count *
-                graphics_root_param_infos[1].num_descriptors) *
+        tex_resource_info = malloc(swp_chain_info.buffer_count *
+                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors *
                 sizeof (struct gpu_resource_info));
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                graphics_root_param_infos[1].num_descriptors; ++i) {
+                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors; ++i) {
                 create_wstring(tex_resource_info[i].name,
                         L"Tex resource %d", i);
                 tex_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
@@ -510,39 +502,23 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tex_resource_info[i].mip_levels = 1;
                 tex_resource_info[i].format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 tex_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-                tex_resource_info[i].flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-                tex_resource_info[i].current_state = D3D12_RESOURCE_STATE_COPY_DEST;
+                tex_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
+                tex_resource_info[i].current_state = D3D12_RESOURCE_STATE_COMMON;
                 create_resource(&device_info, &tex_resource_info[i]);
 
                 update_cpu_handle(&graphics_cbv_srv_uav_descriptor_info,
-                        swp_chain_info.buffer_count * i + 1);
+                        num_graphics_cbv_srv_uav_descriptors * i + SRV_GRAPHICS_DESCRIPTOR_INDEX); // 1, 3
 
                 // Create shader resource view
+                struct gpu_view_info tex_view_info;
+                tex_view_info.srv_dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
                 create_shader_resource_view(&device_info, 
-                        &graphics_cbv_srv_uav_descriptor_info, &tex_resource_info[i]);
-        }
+                        &graphics_cbv_srv_uav_descriptor_info,
+                        &tex_resource_info[i], &tex_view_info);
 
-        // Make sure vertex and index upload is done before copy command allocator and list is reset
-        wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
-
-        reset_cmd_allocators(&copy_cmd_allocator_info);
-
-        reset_cmd_list(&copy_cmd_allocator_info, &copy_cmd_list_info,
-                swp_chain_info.current_buffer_index);
-
-        for (UINT i = 0; i < swp_chain_info.buffer_count *
-                graphics_root_param_infos[1].num_descriptors; ++i) {
                 rec_copy_texture_region_cmd(&copy_cmd_list_info,
                         &tex_resource_info[i], &tex_upload_resource_info);
-
-                transition_resource_info_list[i] = &tex_resource_info[i];
-                transition_resource_states_list[i] = D3D12_RESOURCE_STATE_COMMON;
         }
-
-        // Transition texture shader resource to read/write buffer
-        transition_resources(&copy_cmd_list_info, transition_resource_info_list,
-                transition_resource_states_list, swp_chain_info.buffer_count *
-                graphics_root_param_infos[1].num_descriptors);
 
         // Close command list for execution
         close_cmd_list(&copy_cmd_list_info);
@@ -551,37 +527,75 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         execute_cmd_list(&copy_queue_info, &copy_cmd_list_info);
 
         // Signal GPU for texture upload of copy queue work
-        signal_gpu(&copy_queue_info, &fence_info,
+        signal_gpu_with_fence(&copy_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
-        // Make sure compute queue which will use the texture waits for it be uploaded
-        wait_for_fence(&compute_queue_info, &fence_info,
+        // Make sure render queue which will use the texture waits for it be uploaded
+        wait_for_fence_on_gpu(&render_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
+
+        #define MAX_RESOURCE_TRANSITION_COUNT 10
+        struct gpu_resource_info *transition_resource_info_list[MAX_RESOURCE_TRANSITION_COUNT];
+        D3D12_RESOURCE_STATES transition_resource_states_list[MAX_RESOURCE_TRANSITION_COUNT];
+
+        UINT resource_transition_index = 0;
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
+                ++i, ++resource_transition_index) {
+
+                transition_resource_info_list[resource_transition_index] =
+                        &tex_resource_info[i];
+                transition_resource_states_list[resource_transition_index] =
+                        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+
+        transition_resource_info_list[resource_transition_index] = &vert_gpu_resource_info;
+        transition_resource_states_list[resource_transition_index++] =
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+        transition_resource_info_list[resource_transition_index] = &indices_gpu_resource_info;
+        transition_resource_states_list[resource_transition_index++] =
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+        transition_resources(&render_cmd_list_info, transition_resource_info_list,
+                transition_resource_states_list, resource_transition_index);
 
         // Compile compute shader
         struct gpu_shader_info comp_shader_info;
         comp_shader_info.shader_file = L"shaders\\tri_comp_shader.hlsl";
-        comp_shader_info.shader_target = "cs_5_1";
+        comp_shader_info.shader_target = "cs_6_5";
         compile_shader(&comp_shader_info);
 
         // Create compute root signature
-        struct gpu_root_param_info compute_root_param_infos[2];
+        #define NUM_COMPUTE_ROOT_PARAM 3
+        struct gpu_root_param_info compute_root_param_infos[NUM_COMPUTE_ROOT_PARAM];
 
-        compute_root_param_infos[0].range_type =
+        // Layout of compute root sig
+        #define CBV_COMPUTE_ROOT_PARAM_INDEX 0
+        #define SRV_COMPUTE_ROOT_PARAM_INDEX 1
+        #define UAV_COMPUTE_ROOT_PARAM_INDEX 2
+
+        compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        compute_root_param_infos[0].num_descriptors = 1;
-        compute_root_param_infos[0].shader_visbility =
+        compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors = 1;
+        compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_ALL;
 
-        compute_root_param_infos[1].range_type =
+        compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].range_type =
+                D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors = 1;
+        compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].shader_visbility =
+                D3D12_SHADER_VISIBILITY_ALL;
+
+        compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        compute_root_param_infos[1].num_descriptors = 1;
-        compute_root_param_infos[1].shader_visbility =
+        compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors = 1;
+        compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_ALL;
 
         struct gpu_root_sig_info compute_root_sig_info;
         create_wstring(compute_root_sig_info.name, L"Compute Root sig");
-        create_root_sig(&device_info, compute_root_param_infos, 2,
+        create_root_sig(&device_info, compute_root_param_infos, NUM_COMPUTE_ROOT_PARAM,
                 &compute_root_sig_info);
 
         // Create compute pipeline state object
@@ -596,34 +610,41 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 &compute_pso_info);
 
         // Create constant buffer descriptor for compute
+        UINT num_compute_cbv_srv_uav_descriptors =
+                compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors +
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors +
+                compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
         struct gpu_descriptor_info compute_cbv_srv_uav_descriptor_info;
         create_wstring(compute_cbv_srv_uav_descriptor_info.name,
-                L"Compute CBV heap");
+                L"Compute CBV SRV UAV heap");
         compute_cbv_srv_uav_descriptor_info.type =
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         compute_cbv_srv_uav_descriptor_info.num_descriptors =
-                swp_chain_info.buffer_count *
-                (compute_root_param_infos[0].num_descriptors +
-                compute_root_param_infos[1].num_descriptors);
+                swp_chain_info.buffer_count * num_compute_cbv_srv_uav_descriptors;
         compute_cbv_srv_uav_descriptor_info.flags =
                 D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         create_descriptor(&device_info, &compute_cbv_srv_uav_descriptor_info);
 
-        // Create constant buffer resource
+        vec2 window_bounds = { (float) wnd_info.width, (float) wnd_info.height };
+
+        #define CBV_COMPUTE_DESCRIPTOR_INDEX 0
+        #define SRV_COMPUTE_DESCRIPTOR_INDEX 1
+        #define UAV_COMPUTE_DESCRIPTOR_INDEX 2
+
+        // Create compute cbv resource
         struct gpu_resource_info *compute_cbv_resource_info;
-        compute_cbv_resource_info = malloc(
-                (swp_chain_info.buffer_count *
-                compute_root_param_infos[0].num_descriptors) *
-                sizeof(struct gpu_resource_info));
-        
+        compute_cbv_resource_info = malloc(swp_chain_info.buffer_count *
+                compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors *
+                sizeof (struct gpu_resource_info));
         for (UINT i = 0; i < swp_chain_info.buffer_count *
                 compute_root_param_infos[0].num_descriptors; ++i) {
                 create_wstring(compute_cbv_resource_info[i].name,
                         L"Compute CBV resource %d", i);
                 compute_cbv_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
-                compute_cbv_resource_info[i].dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+                compute_cbv_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
                 compute_cbv_resource_info[i].width =
-                        align_offset(sizeof (float), 256);
+                        align_offset(sizeof (window_bounds), 256);
                 compute_cbv_resource_info[i].height = 1;
                 compute_cbv_resource_info[i].mip_levels = 1;
                 compute_cbv_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
@@ -633,26 +654,184 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         D3D12_RESOURCE_STATE_GENERIC_READ;
                 create_resource(&device_info, &compute_cbv_resource_info[i]);
 
+                // Upload constant buffer resource
+                upload_resources(&compute_cbv_resource_info[i], window_bounds);
+
                 update_cpu_handle(&compute_cbv_srv_uav_descriptor_info,
-                        swp_chain_info.buffer_count * i);
+                        num_compute_cbv_srv_uav_descriptors * i +
+                        CBV_COMPUTE_DESCRIPTOR_INDEX); // 0, 3
 
                 // Create constant buffer view
                 create_constant_buffer_view(&device_info,
-                        &compute_cbv_srv_uav_descriptor_info, 
+                        &compute_cbv_srv_uav_descriptor_info,
                         &compute_cbv_resource_info[i]);
         }
 
-        time_t previous_time_in_sec = time_in_secs();
+        // Create BLAS RTX acceleration struct.
+        // This takes in all the mesh data
+        struct gpu_dxr_info blas_info;
+        create_blas_prebuild_info(&device_info, &triangle_mesh, &vert_gpu_resource_info,
+                &indices_gpu_resource_info, &blas_info);
+
+        struct gpu_resource_info blas_dest_resource_info;
+        create_wstring(blas_dest_resource_info.name,
+                L"BLAS Dest resource");
+        blas_dest_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
+        blas_dest_resource_info.dimension =
+                D3D12_RESOURCE_DIMENSION_BUFFER;
+        blas_dest_resource_info.width =
+                blas_info.prebuild_info.ResultDataMaxSizeInBytes;
+        blas_dest_resource_info.height = 1;
+        blas_dest_resource_info.mip_levels = 1;
+        blas_dest_resource_info.format = DXGI_FORMAT_UNKNOWN;
+        blas_dest_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        blas_dest_resource_info.flags =
+                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        blas_dest_resource_info.current_state =
+                D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+        create_resource(&device_info, &blas_dest_resource_info);
+
+        struct gpu_resource_info blas_scratch_resource_info;
+        create_wstring(blas_scratch_resource_info.name,
+                L"BLAS Scratch resource");
+        blas_scratch_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
+        blas_scratch_resource_info.dimension =
+                D3D12_RESOURCE_DIMENSION_BUFFER;
+        blas_scratch_resource_info.width =
+                blas_info.prebuild_info.ScratchDataSizeInBytes;
+        blas_scratch_resource_info.height = 1;
+        blas_scratch_resource_info.mip_levels = 1;
+        blas_scratch_resource_info.format = DXGI_FORMAT_UNKNOWN;
+        blas_scratch_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        blas_scratch_resource_info.flags =
+                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        blas_scratch_resource_info.current_state =
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        create_resource(&device_info, &blas_scratch_resource_info);
+
+        rec_build_dxr_acceleration_struct(&render_cmd_list_info,
+                &blas_dest_resource_info, &blas_scratch_resource_info, NULL,
+                &blas_info);
+
+        transition_resource_info_list[0] = &vert_gpu_resource_info;
+        transition_resource_info_list[1] = &indices_gpu_resource_info;
+
+        transition_resource_states_list[0] =
+                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        transition_resource_states_list[1] =
+                D3D12_RESOURCE_STATE_INDEX_BUFFER;
+
+        transition_resources(&render_cmd_list_info, transition_resource_info_list,
+                transition_resource_states_list, 2);
+
+        struct gpu_resource_info *uav_barrier_resource_info_list[MAX_RESOURCE_TRANSITION_COUNT];
+        uav_barrier_resource_info_list[0] = &blas_dest_resource_info;
+        uav_barrier(&render_cmd_list_info, uav_barrier_resource_info_list, 1);
+
+        struct gpu_resource_info instance_resource_info;
+        create_wstring(instance_resource_info.name, L"TLAS Instance resource");
+        instance_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
+        instance_resource_info.dimension =
+                D3D12_RESOURCE_DIMENSION_BUFFER;
+        instance_resource_info.width =
+                sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
+        instance_resource_info.height = 1;
+        instance_resource_info.mip_levels = 1;
+        instance_resource_info.format = DXGI_FORMAT_UNKNOWN;
+        instance_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        instance_resource_info.flags =
+                D3D12_RESOURCE_FLAG_NONE;
+        instance_resource_info.current_state =
+                D3D12_RESOURCE_STATE_GENERIC_READ;
+        create_resource(&device_info, &instance_resource_info);
+
+        struct gpu_dxr_info tlas_info;
+        create_tlas_prebuild_info(&device_info, &blas_dest_resource_info,
+                &instance_resource_info, &tlas_info);
+
+        struct gpu_resource_info *tlas_dest_resource_info;
+        tlas_dest_resource_info = malloc(swp_chain_info.buffer_count *
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors *
+                sizeof (struct gpu_resource_info));
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                create_wstring(tlas_dest_resource_info[i].name,
+                        L"TLAS Dest resource %d", i);
+                tlas_dest_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                tlas_dest_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                tlas_dest_resource_info[i].width =
+                        tlas_info.prebuild_info.ResultDataMaxSizeInBytes;
+                tlas_dest_resource_info[i].height = 1;
+                tlas_dest_resource_info[i].mip_levels = 1;
+                tlas_dest_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                tlas_dest_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                tlas_dest_resource_info[i].flags =
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                tlas_dest_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+                create_resource(&device_info, &tlas_dest_resource_info[i]);
+        }
+
+        struct gpu_resource_info *tlas_scratch_resource_info;
+        tlas_scratch_resource_info = malloc(swp_chain_info.buffer_count *
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors *
+                sizeof (struct gpu_resource_info));
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                create_wstring(tlas_scratch_resource_info[i].name,
+                        L"TLAS Scratch resource %d", i);
+                tlas_scratch_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                tlas_scratch_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                tlas_scratch_resource_info[i].width =
+                        tlas_info.prebuild_info.ScratchDataSizeInBytes;
+                tlas_scratch_resource_info[i].height = 1;
+                tlas_scratch_resource_info[i].mip_levels = 1;
+                tlas_scratch_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                tlas_scratch_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                tlas_scratch_resource_info[i].flags =
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                tlas_scratch_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                create_resource(&device_info, &tlas_scratch_resource_info[i]);
+        }
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[1].num_descriptors; ++i) {
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                rec_build_dxr_acceleration_struct(&render_cmd_list_info,
+                        &tlas_dest_resource_info[i], &tlas_scratch_resource_info[i],
+                        &instance_resource_info, &tlas_info);
+
+                // UAV write barrier
+                uav_barrier_resource_info_list[0] = &tlas_dest_resource_info[i];
+                uav_barrier(&render_cmd_list_info, uav_barrier_resource_info_list, 1);
+        }
+
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
                 update_cpu_handle(&compute_cbv_srv_uav_descriptor_info,
-                        swp_chain_info.buffer_count * i + 1);
+                        num_compute_cbv_srv_uav_descriptors * i + SRV_COMPUTE_DESCRIPTOR_INDEX); // 1, 4
+
+                struct gpu_view_info rtx_acc_view_info;
+                rtx_acc_view_info.srv_dimension =
+                        D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+                create_shader_resource_view(&device_info,
+                        &compute_cbv_srv_uav_descriptor_info,
+                        &tlas_dest_resource_info[i], &rtx_acc_view_info);
+        }
+
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                update_cpu_handle(&compute_cbv_srv_uav_descriptor_info,
+                        num_compute_cbv_srv_uav_descriptors * i + UAV_COMPUTE_DESCRIPTOR_INDEX); // 2, 5
 
                 // Create unordered access view
+                struct gpu_view_info tex_view_info;
+                tex_view_info.uav_dimension = D3D12_UAV_DIMENSION_TEXTURE2D;
                 create_unorderd_access_view(&device_info,
                         &compute_cbv_srv_uav_descriptor_info,
-                        &tex_resource_info[i]);
+                        &tmp_rtv_resource_info[i], &tex_view_info);
         }
 
         LONG_PTR wndproc_data[] = { (LONG_PTR) &wnd_info,
@@ -660,7 +839,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 (LONG_PTR) &swp_chain_info, (LONG_PTR) &rtv_descriptor_info,
                 (LONG_PTR) &rtv_resource_info[0], (LONG_PTR) &tmp_rtv_descriptor_info,
                 (LONG_PTR) &tmp_rtv_resource_info[0], (LONG_PTR) &fence_info,
-                (LONG_PTR) &dsv_descriptor_info, (LONG_PTR) &dsv_resource_info[0]
+                (LONG_PTR) &dsv_descriptor_info, (LONG_PTR) &dsv_resource_info[0],
+                (LONG_PTR) &compute_root_param_infos[0], (LONG_PTR) &compute_cbv_srv_uav_descriptor_info,
+                (LONG_PTR) &num_compute_cbv_srv_uav_descriptors
         };
         SetWindowLongPtr(wnd_info.hwnd, GWLP_USERDATA, (LONG_PTR) wndproc_data);
 
@@ -668,99 +849,19 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         do {
                 queued_window_msg = window_message_loop();
 
-                time_t current_time_in_sec = time_in_secs();
-                time_t sec = current_time_in_sec - previous_time_in_sec;
-
-                float float_sec = (float) sec;
-
-                upload_resources(&compute_cbv_resource_info[swp_chain_info.current_buffer_index],
-                        &float_sec);
-
-                // Transition texture shader resource to UAV
-                transition_resource_info_list[0] =
-                        &tex_resource_info[swp_chain_info.current_buffer_index];
-
-                transition_resource_states_list[0] =
-                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-
-                transition_resources(&compute_cmd_list_info,
-                        transition_resource_info_list,
-                        transition_resource_states_list, 1);
-
-                // Set pipeline state
-                rec_set_pipeline_state_cmd(&compute_cmd_list_info,
-                        &compute_pso_info);
-
-                // Set root signature
-                rec_set_compute_root_sig_cmd(&compute_cmd_list_info,
-                        &compute_root_sig_info);
-
-                // Set descriptor heap for compute constant buffer
-                rec_set_descriptor_heap_cmd(&compute_cmd_list_info,
-                        &compute_cbv_srv_uav_descriptor_info);
-
-                update_gpu_handle(&compute_cbv_srv_uav_descriptor_info, 
-                    swp_chain_info.buffer_count *
-                    swp_chain_info.current_buffer_index);
-
-                // Set constant buffer table
-                rec_set_compute_root_descriptor_table_cmd(
-                        &compute_cmd_list_info, 0,
-                        &compute_cbv_srv_uav_descriptor_info);
-
-                update_gpu_handle(&compute_cbv_srv_uav_descriptor_info,
-                        (swp_chain_info.buffer_count *
-                        swp_chain_info.current_buffer_index) + 1);
-
-                // Set shader resource table
-                rec_set_compute_root_descriptor_table_cmd(
-                        &compute_cmd_list_info, 1,
-                        &compute_cbv_srv_uav_descriptor_info);
-
-                // Call compute dispatch
-                rec_dispatch_cmd(&compute_cmd_list_info, 
-                        (UINT) tex_resource_info[swp_chain_info.current_buffer_index].width / 8,
-                        (UINT) tex_resource_info[swp_chain_info.current_buffer_index].height / 8,
-                        1);
-
-                // Close command list for execution
-                close_cmd_list(&compute_cmd_list_info);
-
-                // Exexute command list
-                execute_cmd_list(&compute_queue_info, &compute_cmd_list_info);
-
-                // Signal GPU for compute queue's completion
-                signal_gpu(&compute_queue_info, &fence_info,
-                        swp_chain_info.current_buffer_index);
-
-                // Reder queue needs to wait for compute queue's completion
-                wait_for_fence(&render_queue_info, &fence_info,
-                        swp_chain_info.current_buffer_index);
-
-                transition_resource_info_list[0] =
-                        &tex_resource_info[swp_chain_info.current_buffer_index];
-                transition_resource_info_list[1] =
-                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index];
-
-                transition_resource_states_list[0] =
-                        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-                transition_resource_states_list[1] =
-                        D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-                transition_resources(&render_cmd_list_info,
-                        transition_resource_info_list,
-                        transition_resource_states_list, 2);
-
                 update_cpu_handle(&tmp_rtv_descriptor_info,
                         swp_chain_info.current_buffer_index);
 
+                update_cpu_handle(&dsv_descriptor_info,
+                        swp_chain_info.current_buffer_index);
+
                 // Set the render target and depth target
-                rec_set_render_target_cmd(&render_cmd_list_info, 
+                rec_set_render_target_cmd(&render_cmd_list_info,
                         &tmp_rtv_descriptor_info, &dsv_descriptor_info);
 
                 // Clear render target
                 float clear_color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-                rec_clear_rtv_cmd(&render_cmd_list_info, 
+                rec_clear_rtv_cmd(&render_cmd_list_info,
                         &tmp_rtv_descriptor_info, clear_color);
 
                 // Clear depth target
@@ -790,22 +891,26 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 rec_set_descriptor_heap_cmd(&render_cmd_list_info,
                         &graphics_cbv_srv_uav_descriptor_info);
 
+                // Update gpu handle to cb's position in descriptor heap which will be 0, 2
                 update_gpu_handle(&graphics_cbv_srv_uav_descriptor_info,
-                        swp_chain_info.buffer_count *
-                        swp_chain_info.current_buffer_index);
+                        num_graphics_cbv_srv_uav_descriptors *
+                        swp_chain_info.current_buffer_index +
+                        CBV_GRAPHICS_DESCRIPTOR_INDEX);
 
                 // Set constant buffer table
                 rec_set_graphics_root_descriptor_table_cmd(
-                        &render_cmd_list_info, 0,
+                        &render_cmd_list_info, CBV_GRAPHICS_ROOT_PARAM_INDEX,
                         &graphics_cbv_srv_uav_descriptor_info);
 
+                // Update gpu handle to textures srv position in descriptor heap which will be 1, 3
                 update_gpu_handle(&graphics_cbv_srv_uav_descriptor_info,
-                        (swp_chain_info.buffer_count *
-                        swp_chain_info.current_buffer_index) + 1);
+                        num_graphics_cbv_srv_uav_descriptors *
+                        swp_chain_info.current_buffer_index +
+                        SRV_GRAPHICS_DESCRIPTOR_INDEX);
 
                 // Set shader resource table
                 rec_set_graphics_root_descriptor_table_cmd(
-                        &render_cmd_list_info, 1,
+                        &render_cmd_list_info, SRV_GRAPHICS_ROOT_PARAM_INDEX,
                         &graphics_cbv_srv_uav_descriptor_info);
 
                 // Set descriptor heap for sampler
@@ -814,7 +919,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
                 // Set sampler table
                 rec_set_graphics_root_descriptor_table_cmd(
-                        &render_cmd_list_info, 2,
+                        &render_cmd_list_info, SAMPLER_GRAPHICS_ROOT_PARAM_INDEX,
                         &sampler_descriptor_info);
 
                 // Set vertex buffer
@@ -823,24 +928,20 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
                 // Set index buffer
                 rec_set_index_buffer_cmd(&render_cmd_list_info,
-                        &indices_gpu_resource_info);
+                        &indices_gpu_resource_info, &triangle_mesh);
 
                 // Draw indexed instanced
                 rec_draw_indexed_instance_cmd(&render_cmd_list_info,
                         triangle_mesh.index_count, 1);
 
                 transition_resource_info_list[0] =
-                        &tex_resource_info[swp_chain_info.current_buffer_index];
-                transition_resource_info_list[1] =
                         &tmp_rtv_resource_info[swp_chain_info.current_buffer_index];
 
-                transition_resource_states_list[0] = D3D12_RESOURCE_STATE_COMMON;
-                transition_resource_states_list[1] =
-                        D3D12_RESOURCE_STATE_COPY_SOURCE;
+                transition_resource_states_list[0] =
+                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
-                transition_resources(&render_cmd_list_info,
-                        transition_resource_info_list,
-                        transition_resource_states_list, 2);
+                transition_resources(&render_cmd_list_info, transition_resource_info_list,
+                        transition_resource_states_list, 1);
 
                 // Close command list for execution
                 close_cmd_list(&render_cmd_list_info);
@@ -849,42 +950,116 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 execute_cmd_list(&render_queue_info, &render_cmd_list_info);
 
                 // Signal GPU for render queue's completion
-                signal_gpu(&render_queue_info, &fence_info,
+                signal_gpu_with_fence(&render_queue_info, &fence_info,
+                        swp_chain_info.current_buffer_index);
+
+                // compute queue needs to wait for render queue's completion
+                wait_for_fence_on_gpu(&compute_queue_info, &fence_info,
+                        swp_chain_info.current_buffer_index);
+
+                // Set pipeline state
+                rec_set_pipeline_state_cmd(&compute_cmd_list_info,
+                        &compute_pso_info);
+
+                // Set root signature
+                rec_set_compute_root_sig_cmd(&compute_cmd_list_info,
+                        &compute_root_sig_info);
+
+                // Set descriptor heap for compute constant buffer
+                rec_set_descriptor_heap_cmd(&compute_cmd_list_info,
+                        &compute_cbv_srv_uav_descriptor_info);
+
+                window_bounds[0] = (float) wnd_info.width;
+                window_bounds[1] = (float) wnd_info.height;
+
+                // Upload constant buffer resource
+                upload_resources(&compute_cbv_resource_info[swp_chain_info.current_buffer_index],
+                        window_bounds);
+
+                update_gpu_handle(&compute_cbv_srv_uav_descriptor_info,
+                        num_compute_cbv_srv_uav_descriptors *
+                        swp_chain_info.current_buffer_index +
+                        CBV_COMPUTE_DESCRIPTOR_INDEX);
+
+                // Set cbv
+                rec_set_compute_root_descriptor_table_cmd(
+                        &compute_cmd_list_info, CBV_COMPUTE_ROOT_PARAM_INDEX,
+                        &compute_cbv_srv_uav_descriptor_info);
+
+                update_gpu_handle(&compute_cbv_srv_uav_descriptor_info,
+                        num_compute_cbv_srv_uav_descriptors *
+                        swp_chain_info.current_buffer_index +
+                        SRV_COMPUTE_DESCRIPTOR_INDEX);
+
+                // Set rtx and srv table
+                rec_set_compute_root_descriptor_table_cmd(
+                        &compute_cmd_list_info, SRV_COMPUTE_ROOT_PARAM_INDEX,
+                        &compute_cbv_srv_uav_descriptor_info);
+
+                update_gpu_handle(&compute_cbv_srv_uav_descriptor_info,
+                        num_compute_cbv_srv_uav_descriptors *
+                        swp_chain_info.current_buffer_index +
+                        UAV_COMPUTE_DESCRIPTOR_INDEX);
+
+                // Set uav
+                rec_set_compute_root_descriptor_table_cmd(
+                        &compute_cmd_list_info, UAV_COMPUTE_ROOT_PARAM_INDEX,
+                        &compute_cbv_srv_uav_descriptor_info);
+
+                // Call compute dispatch
+                rec_dispatch_cmd(&compute_cmd_list_info,
+                        wnd_info.width / 8,
+                        wnd_info.height / 8,
+                        1);
+
+                // Close command list for execution
+                close_cmd_list(&compute_cmd_list_info);
+
+                // Exexute command list
+                execute_cmd_list(&compute_queue_info, &compute_cmd_list_info);
+
+                // Signal GPU for compute queue's completion
+                signal_gpu_with_fence(&compute_queue_info, &fence_info,
                         swp_chain_info.current_buffer_index);
 
                 // Present queue needs to wait for render queue to be done
-                wait_for_fence(&present_queue_info, &fence_info,
+                wait_for_fence_on_gpu(&present_queue_info, &fence_info,
                         swp_chain_info.current_buffer_index);
+
+                transition_resource_info_list[0] =
+                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index];
+                transition_resource_info_list[1] =
+                        &rtv_resource_info[swp_chain_info.current_buffer_index];
+
+                transition_resource_states_list[0] =
+                        D3D12_RESOURCE_STATE_COPY_SOURCE;
+                transition_resource_states_list[1] =
+                        D3D12_RESOURCE_STATE_COPY_DEST;
+
+                transition_resources(&present_cmd_list_info, transition_resource_info_list,
+                        transition_resource_states_list, 2);
 
                 // Point render target view cpu handle to correct descriptor in descriptor heap
                 update_cpu_handle(&rtv_descriptor_info,
                         swp_chain_info.current_buffer_index);
 
-                // Transition render target buffer to copy dest state
-                transition_resource_info_list[0] =
-                        &rtv_resource_info[swp_chain_info.current_buffer_index];
-
-                transition_resource_states_list[0] =
-                        D3D12_RESOURCE_STATE_COPY_DEST;
-
-                transition_resources(&present_cmd_list_info,
-                        transition_resource_info_list,
-                        transition_resource_states_list, 1);
-
                 rec_copy_resource_cmd(&present_cmd_list_info,
                         &rtv_resource_info[swp_chain_info.current_buffer_index],
                         &tmp_rtv_resource_info[swp_chain_info.current_buffer_index]);
 
-                // Transition render target buffer to present state
                 transition_resource_info_list[0] =
+                        &tmp_rtv_resource_info[swp_chain_info.current_buffer_index];
+                transition_resource_info_list[1] =
                         &rtv_resource_info[swp_chain_info.current_buffer_index];
 
                 transition_resource_states_list[0] =
+                        D3D12_RESOURCE_STATE_RENDER_TARGET;
+                transition_resource_states_list[1] =
                         D3D12_RESOURCE_STATE_PRESENT;
 
                 transition_resources(&present_cmd_list_info,
                         transition_resource_info_list,
-                        transition_resource_states_list, 1);
+                        transition_resource_states_list, 2);
 
                 // Close command list for execution
                 close_cmd_list(&present_cmd_list_info);
@@ -893,14 +1068,16 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 execute_cmd_list(&present_queue_info, &present_cmd_list_info);
 
                 // Present swapchain
+                // This updates/toggles current_buffer_index
                 present_swapchain(&swp_chain_info);
 
                 // Signal GPU for present queues completion
-                signal_gpu(&present_queue_info, &fence_info,
-                    swp_chain_info.current_buffer_index);
+                signal_gpu_with_fence(&present_queue_info, &fence_info,
+                        swp_chain_info.current_buffer_index);
 
                 // Wait for gpu to finish previous frame
-                wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
+                wait_for_fence_on_cpu(&fence_info,
+                        swp_chain_info.current_buffer_index);
 
                 // Reset command allocator
                 reset_cmd_allocator(&render_cmd_allocator_info,
@@ -932,13 +1109,33 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         } while (queued_window_msg != WM_QUIT);
 
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(&present_queue_info, &fence_info,
+        signal_gpu_with_fence(&present_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
-        wait_for_gpu(&fence_info, swp_chain_info.current_buffer_index);
+        wait_for_fence_on_cpu(&fence_info, swp_chain_info.current_buffer_index);
+
+        release_resource(&instance_resource_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[0].num_descriptors; ++i) {
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                release_resource(&tlas_scratch_resource_info[i]);
+        }
+
+        free(tlas_scratch_resource_info);
+
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                release_resource(&tlas_dest_resource_info[i]);
+        }
+
+        free(tlas_dest_resource_info);
+
+        release_resource(&blas_scratch_resource_info);
+
+        release_resource(&blas_dest_resource_info);
+
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
                 release_resource(&compute_cbv_resource_info[i]);
         }
 
@@ -955,8 +1152,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         release_shader(&comp_shader_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-            graphics_root_param_infos[1].num_descriptors; ++i) {
-            release_resource(&tex_resource_info[i]);
+                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                release_resource(&tex_resource_info[i]);
         }
 
         free(tex_resource_info);
@@ -966,8 +1163,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         release_material(&checkerboard_mat_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-            graphics_root_param_infos[0].num_descriptors; ++i) {
-            release_resource(&graphics_cbv_resource_info[i]);
+                graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                release_resource(&graphics_cbv_resource_info[i]);
         }
 
         free(graphics_cbv_resource_info);
@@ -992,7 +1189,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Release depth stencil buffer resource
         for (UINT i = 0; i < dsv_descriptor_info.num_descriptors; ++i) {
-            release_resource(&dsv_resource_info[i]);
+                release_resource(&dsv_resource_info[i]);
         }
 
         free(dsv_resource_info);

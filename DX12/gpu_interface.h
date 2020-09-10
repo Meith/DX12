@@ -4,13 +4,16 @@
 #define COBJMACROS
 
 #include <dxgi1_6.h>
-#include "d3d12.h" // Including modified d3d12.h since their c interface is broken
+#include <d3d12.h>
 #include <d3dcompiler.h>
+#include <dxgidebug.h>
+
+#include "mesh_interface.h"
 
 struct gpu_device_info {
-        ID3D12Debug *debug;
+        ID3D12Debug1 *debug1;
         IDXGIFactory5 *factory5;
-        ID3D12Device *device;
+        ID3D12Device5 *device5;
 };
 
 void create_gpu_device(struct gpu_device_info *device_info);
@@ -69,23 +72,53 @@ void update_cpu_handle(struct gpu_descriptor_info *descriptor_info,
         UINT index);
 void update_gpu_handle(struct gpu_descriptor_info *descriptor_info,
         UINT index);
+
+
+struct gpu_view_info {
+        union {
+                D3D12_RTV_DIMENSION rtv_dimension;
+                D3D12_DSV_DIMENSION dsv_dimension;
+                D3D12_UAV_DIMENSION uav_dimension;
+                D3D12_SRV_DIMENSION srv_dimension;
+        };
+};
+
 void create_rendertarget_view(struct gpu_device_info *device_info,
         struct gpu_descriptor_info *descriptor_info,
-        struct gpu_resource_info *resource_info);
+        struct gpu_resource_info *resource_info,
+        struct gpu_view_info *view_info);
 void create_depthstencil_view(struct gpu_device_info *device_info,
         struct gpu_descriptor_info *descriptor_info,
-        struct gpu_resource_info *resource_info);
+        struct gpu_resource_info *resource_info,
+        struct gpu_view_info *view_info);
 void create_constant_buffer_view(struct gpu_device_info *device_info,
         struct gpu_descriptor_info *descriptor_info,
         struct gpu_resource_info *resource_info);
 void create_unorderd_access_view(struct gpu_device_info *device_info,
         struct gpu_descriptor_info *descriptor_info,
-        struct gpu_resource_info *resource_info);
+        struct gpu_resource_info *resource_info,
+        struct gpu_view_info *view_info);
 void create_shader_resource_view(struct gpu_device_info *device_info,
         struct gpu_descriptor_info *descriptor_info,
-        struct gpu_resource_info *resource_info);
+        struct gpu_resource_info *resource_info,
+        struct gpu_view_info *view_info);
 void create_sampler(struct gpu_device_info *device_info,
         struct gpu_descriptor_info *descriptor_info);
+
+
+struct gpu_dxr_info {
+        D3D12_RAYTRACING_GEOMETRY_DESC geom_desc;
+        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS struct_inputs;
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuild_info;
+};
+
+void create_blas_prebuild_info(struct gpu_device_info *device_info,
+        struct mesh_info *mi, struct gpu_resource_info *vert_info,
+        struct gpu_resource_info *index_info, struct gpu_dxr_info *dxr_info);
+void create_tlas_prebuild_info(struct gpu_device_info *device_info,
+        struct gpu_resource_info *blas_dest_resource_info,
+        struct gpu_resource_info *instance_resource_info,
+        struct gpu_dxr_info *dxr_info);
 
 
 struct gpu_cmd_allocator_info {
@@ -106,7 +139,7 @@ void reset_cmd_allocator(struct gpu_cmd_allocator_info *cmd_allocator_info,
 struct gpu_cmd_list_info {
         WCHAR name[1024];
         D3D12_COMMAND_LIST_TYPE cmd_list_type;
-        ID3D12GraphicsCommandList *cmd_list;
+        ID3D12GraphicsCommandList4 *cmd_list4;
 };
 
 void create_cmd_list(struct gpu_device_info *device_info,
@@ -157,7 +190,8 @@ void rec_set_graphics_root_descriptor_table_cmd(
 void rec_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info *vert_buffer, UINT stride);
 void rec_set_index_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
-        struct gpu_resource_info *index_buffer);
+        struct gpu_resource_info *index_buffer,
+        struct mesh_info *mi);
 void rec_dispatch_cmd(struct gpu_cmd_list_info *cmd_list_info,
         UINT thread_group_coun_x, UINT thread_group_coun_y,
         UINT thread_group_coun_z);
@@ -166,6 +200,13 @@ void rec_draw_indexed_instance_cmd(struct gpu_cmd_list_info *cmd_list_info,
 void transition_resources(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info **resource_info_list,
         D3D12_RESOURCE_STATES *resource_end_state_list, UINT resource_count);
+void uav_barrier(struct gpu_cmd_list_info *cmd_list_info,
+        struct gpu_resource_info **resource_info_list, UINT resource_count);
+void rec_build_dxr_acceleration_struct(struct gpu_cmd_list_info *cmd_list_info,
+        struct gpu_resource_info *dest_resource_info,
+        struct gpu_resource_info *scratch_resource_info,
+        struct gpu_resource_info *instance_resource_info,
+        struct gpu_dxr_info *dxr_info);
 
 
 struct gpu_fence_info {
@@ -180,16 +221,16 @@ struct gpu_fence_info {
 void create_fence(struct gpu_device_info *device_info,
         struct gpu_fence_info *fence_info);
 void release_fence(struct gpu_fence_info *fence_info);
-void signal_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
+void reset_fence(struct gpu_fence_info *fence_info);
+void signal_gpu_with_fence(struct gpu_cmd_queue_info *cmd_queue_info,
         struct gpu_fence_info *fence_info, UINT index);
-void wait_for_fence(struct gpu_cmd_queue_info *cmd_queue_info,
+void wait_for_fence_on_gpu(struct gpu_cmd_queue_info *cmd_queue_info,
         struct gpu_fence_info *fence_info, UINT index);
-void wait_for_gpu(struct gpu_fence_info *fence_info, UINT index);
+void wait_for_fence_on_cpu(struct gpu_fence_info *fence_info, UINT index);
 
 
 struct gpu_shader_info {
         LPCWSTR shader_file;
-        UINT flags;
         LPCSTR shader_target;
         ID3DBlob *shader_blob;
         void *shader_byte_code;

@@ -94,6 +94,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
         struct gpu_resource_info *dsv_resource_info =
                 (struct gpu_resource_info *) wndproc_data[10];
 
+        struct gpu_root_param_info *compute_root_param_infos =
+                (struct gpu_root_param_info *) wndproc_data[11];
+
+        struct gpu_descriptor_info *compute_cbv_srv_uav_descriptor_info =
+                (struct gpu_descriptor_info *) wndproc_data[12];
+
+        UINT *num_compute_cbv_srv_uav_descriptors =
+                (UINT *) wndproc_data[13];
+
         switch (nonqueued_msg)
         {
                 case WM_DESTROY :
@@ -108,7 +117,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT nonqueued_msg, WPARAM wparam,
                                 swp_chain_info, rtv_descriptor_info,
                                 rtv_resource_info, tmp_rtv_descriptor_info,
                                 tmp_rtv_resource_info, fence_info,
-                                dsv_descriptor_info, dsv_resource_info);
+                                dsv_descriptor_info, dsv_resource_info,
+                                compute_root_param_infos, compute_cbv_srv_uav_descriptor_info,
+                                num_compute_cbv_srv_uav_descriptors);
                         break;
                 }
 
@@ -132,18 +143,18 @@ static void resize_window(struct window_info *wnd_info,
         struct gpu_resource_info *tmp_rtv_resource_info,
         struct gpu_fence_info *fence_info,
         struct gpu_descriptor_info *dsv_descriptor_info,
-        struct gpu_resource_info *dsv_resource_info)
+        struct gpu_resource_info *dsv_resource_info,
+        struct gpu_root_param_info *compute_root_param_infos,
+        struct gpu_descriptor_info *compute_cbv_srv_uav_descriptor_info,
+        UINT *num_compute_cbv_srv_uav_descriptors)
 {
-        RECT client_rect;
-        GetClientRect(wnd_info->hwnd, &client_rect);
-        wnd_info->width = client_rect.right - client_rect.left;
-        wnd_info->height = client_rect.bottom - client_rect.top;
-
         // Wait for GPU to finish up be starting the cleaning
-        signal_gpu(present_queue_info, fence_info,
+        signal_gpu_with_fence(present_queue_info, fence_info,
                 swp_chain_info->current_buffer_index);
-        wait_for_gpu(fence_info, 
+        wait_for_fence_on_cpu(fence_info,
                 swp_chain_info->current_buffer_index);
+
+        reset_fence(fence_info);
 
         for (UINT i = 0; i < rtv_descriptor_info->num_descriptors; ++i) {
                 release_resource(&rtv_resource_info[i]);
@@ -157,6 +168,11 @@ static void resize_window(struct window_info *wnd_info,
                 release_resource(&dsv_resource_info[i]);
         }
         
+        RECT client_rect;
+        GetClientRect(wnd_info->hwnd, &client_rect);
+        wnd_info->width = client_rect.right - client_rect.left;
+        wnd_info->height = client_rect.bottom - client_rect.top;
+
         resize_swapchain(wnd_info, swp_chain_info);
 
         for (UINT i = 0; i < rtv_descriptor_info->num_descriptors; ++i) {
@@ -167,8 +183,10 @@ static void resize_window(struct window_info *wnd_info,
                         D3D12_RESOURCE_STATE_PRESENT;
         }
 
+        struct gpu_view_info rtv_view_info;
+        rtv_view_info.rtv_dimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         create_rendertarget_view(device_info, rtv_descriptor_info,
-                rtv_resource_info);
+                rtv_resource_info, &rtv_view_info);
 
         for (UINT i = 0; i < tmp_rtv_descriptor_info->num_descriptors; ++i) {
                 tmp_rtv_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
@@ -180,16 +198,17 @@ static void resize_window(struct window_info *wnd_info,
                 tmp_rtv_resource_info[i].format = swp_chain_info->format;
                 tmp_rtv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
                 tmp_rtv_resource_info[i].flags =
-                        D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                        D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                 tmp_rtv_resource_info[i].current_state =
-                        D3D12_RESOURCE_STATE_PRESENT;
+                        D3D12_RESOURCE_STATE_RENDER_TARGET;
                 create_wstring(tmp_rtv_resource_info[i].name,
                         L"TMP RTV Resource %d", i);
                 create_resource(device_info, &tmp_rtv_resource_info[i]);
         }
 
         create_rendertarget_view(device_info, tmp_rtv_descriptor_info,
-                 tmp_rtv_resource_info);
+                 tmp_rtv_resource_info, &rtv_view_info);
 
         for (UINT i = 0; i < dsv_descriptor_info->num_descriptors; ++i) {
                 create_wstring(dsv_resource_info[i].name, L"DSV resource %d");
@@ -206,8 +225,27 @@ static void resize_window(struct window_info *wnd_info,
         }
 
         // Create depth buffer view
+        struct gpu_view_info dsv_view_info;
+        dsv_view_info.dsv_dimension = D3D12_DSV_DIMENSION_TEXTURE2D;
         create_depthstencil_view(device_info, dsv_descriptor_info,
-                 dsv_resource_info);
+                 dsv_resource_info, &dsv_view_info);
+
+        // Bad indexing code duplication here. Cleanup later.
+        #define UAV_COMPUTE_ROOT_PARAM_INDEX 2
+        #define UAV_COMPUTE_DESCRIPTOR_INDEX 2
+
+        for (UINT i = 0; i < swp_chain_info->buffer_count *
+                compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                update_cpu_handle(compute_cbv_srv_uav_descriptor_info,
+                        *num_compute_cbv_srv_uav_descriptors * i + UAV_COMPUTE_DESCRIPTOR_INDEX); // 2, 5
+
+                // Create unordered access view
+                struct gpu_view_info tex_view_info;
+                tex_view_info.uav_dimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                create_unorderd_access_view(device_info,
+                        compute_cbv_srv_uav_descriptor_info,
+                        &tmp_rtv_resource_info[i], &tex_view_info);
+        }
 }
 
 void destroy_window(struct window_info *wnd_info, HINSTANCE hInstance)

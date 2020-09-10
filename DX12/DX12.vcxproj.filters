@@ -73,14 +73,14 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="shaders\tri_pix_shader.hlsl">
+    <None Include="shaders\tri_comp_shader.hlsl">
       <Filter>Shader Files</Filter>
-    </FxCompile>
-    <FxCompile Include="shaders\tri_vert_shader.hlsl">
+    </None>
+    <None Include="shaders\tri_pix_shader.hlsl">
       <Filter>Shader Files</Filter>
-    </FxCompile>
-    <FxCompile Include="shaders\tri_comp_shader.hlsl">
+    </None>
+    <None Include="shaders\tri_vert_shader.hlsl">
       <Filter>Shader Files</Filter>
-    </FxCompile>
+    </None>
   </ItemGroup>
 </Project>
