@@ -37,12 +37,22 @@ static inline void debug_print(const char *in_str, ...)
 
 static inline void create_wstring(WCHAR out_str[1024], LPCWSTR in_str, ...)
 {
-    va_list arg_list;
-    va_start(arg_list, in_str);
+        va_list arg_list;
+        va_start(arg_list, in_str);
 
-    vswprintf(out_str, 1024, in_str, arg_list);
+        vswprintf(out_str, 1024, in_str, arg_list);
 
-    va_end(arg_list);
+        va_end(arg_list);
+}
+
+static inline void truncate_string(char *str, int key)
+{
+        char *ptr = strchr(str, key);
+         if (ptr)
+         {
+                INT64 index = ptr - str;
+                str[index] = '\0';
+         }
 }
 
 #endif

@@ -1,11 +1,14 @@
 #include "window_interface.h"
 #include "gpu_interface.h"
 #include "swapchain_inerface.h"
-#include "mesh_interface.h"
 #include "camera_interface.h"
 #include "material_interface.h"
 #include "error.h"
 #include "misc.h"
+#include "gltf_interface.h"
+
+#define CGLTF_IMPLEMENTATION
+#include "libs/cgltf/cgltf.h"
 
 
 int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
@@ -188,86 +191,141 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         fence_info.num_fence_value = swp_chain_info.buffer_count;
         create_fence(&device_info, &fence_info);
 
-        // Create triangle mesh
-        struct mesh_info triangle_mesh;
-        create_triangle(&triangle_mesh);
+        // GLTF
+        struct cgltf_data *gltf_pdata;
+        create_gltf("media\\buster_drone\\busterDrone.gltf", &gltf_pdata);
 
-        // Create triangle resource
-        // First resource for vertices on the GPU for shader usage
-        struct gpu_resource_info vert_gpu_resource_info;
-        create_wstring(vert_gpu_resource_info.name, L"Vert GPU resource");
-        vert_gpu_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
-        vert_gpu_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        vert_gpu_resource_info.width = triangle_mesh.stride *
-                triangle_mesh.vertex_count;
-        vert_gpu_resource_info.height = 1;
-        vert_gpu_resource_info.mip_levels = 1;
-        vert_gpu_resource_info.format = DXGI_FORMAT_UNKNOWN;
-        vert_gpu_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        vert_gpu_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
-        vert_gpu_resource_info.current_state = D3D12_RESOURCE_STATE_COMMON;
-        create_resource(&device_info, &vert_gpu_resource_info);
+        struct gltf_node_info *node_info;
+        size_t gltf_node_count = gltf_pdata->nodes_count;
+        size_t gltf_mesh_count = gltf_pdata->meshes_count;
 
-        // Resource for uploading vertices from CPU to GPU
-        struct gpu_resource_info vert_upload_resource_info;
-        create_wstring(vert_upload_resource_info.name, L"Vert upload resource");
-        vert_upload_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
-        vert_upload_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        vert_upload_resource_info.width = sizeof (struct vertex) *
-                triangle_mesh.vertex_count;
-        vert_upload_resource_info.height = 1;
-        vert_upload_resource_info.mip_levels = 1;
-        vert_upload_resource_info.format = DXGI_FORMAT_UNKNOWN;
-        vert_upload_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        vert_upload_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
-        vert_upload_resource_info.current_state =
-                D3D12_RESOURCE_STATE_GENERIC_READ;
-        create_resource(&device_info, &vert_upload_resource_info);
+        // I only want to create renderable nodes
+        node_info = malloc(gltf_mesh_count * sizeof (struct gltf_node_info));
+        // But want to process all nodes
+        process_gltf_nodes(gltf_node_count, node_info, gltf_pdata->nodes);
 
-        // Copy triangle vertex data from cpu to upload resource
-        upload_resources(&vert_upload_resource_info, triangle_mesh.verticies);
+        struct gpu_resource_info *vert_gpu_resource_info;
+        struct gpu_resource_info *vert_upload_resource_info;
+        struct gpu_resource_info *indices_gpu_resource_info;
+        struct gpu_resource_info *indices_upload_resource_info;
 
-        // Copy vertex data from upload resource to gpu shader resource
-        rec_copy_buffer_region_cmd(&copy_cmd_list_info,
-                &vert_gpu_resource_info, &vert_upload_resource_info);
+        vert_gpu_resource_info = malloc(gltf_mesh_count *
+                sizeof (struct gpu_resource_info));
+        vert_upload_resource_info = malloc(gltf_mesh_count *
+                sizeof (struct gpu_resource_info));
+        indices_gpu_resource_info = malloc(gltf_mesh_count *
+                sizeof (struct gpu_resource_info));
+        indices_upload_resource_info = malloc(gltf_mesh_count *
+                sizeof (struct gpu_resource_info));
 
-        // Resource for index buffer on the GPU for shader usage
-        struct gpu_resource_info indices_gpu_resource_info;
-        create_wstring(indices_gpu_resource_info.name, L"Indices GPU resource");
-        indices_gpu_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
-        indices_gpu_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        indices_gpu_resource_info.width = sizeof (unsigned int) *
-                triangle_mesh.index_count;
-        indices_gpu_resource_info.height = 1;
-        indices_gpu_resource_info.mip_levels = 1;
-        indices_gpu_resource_info.format = DXGI_FORMAT_UNKNOWN;
-        indices_gpu_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        indices_gpu_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
-        indices_gpu_resource_info.current_state =
-                D3D12_RESOURCE_STATE_COMMON;
-        create_resource(&device_info, &indices_gpu_resource_info);
+        struct gpu_vert_input_info *vert_input_info;
+        vert_input_info = malloc(gltf_mesh_count *
+                sizeof (struct gpu_vert_input_info));
 
-        // Resource for uploading indices from CPU to GPU
-        struct gpu_resource_info indices_upload_resource_info;
-        create_wstring(indices_upload_resource_info.name, L"Indices upload resource");
-        indices_upload_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
-        indices_upload_resource_info.dimension =
-                D3D12_RESOURCE_DIMENSION_BUFFER;
-        indices_upload_resource_info.width = sizeof (unsigned int) *
-                triangle_mesh.index_count;
-        indices_upload_resource_info.height = 1;
-        indices_upload_resource_info.mip_levels = 1;
-        indices_upload_resource_info.format = DXGI_FORMAT_UNKNOWN;
-        indices_upload_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        indices_upload_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
-        indices_upload_resource_info.current_state =
-                D3D12_RESOURCE_STATE_GENERIC_READ;
-        create_resource(&device_info, &indices_upload_resource_info);
+        for (UINT i = 0; i < gltf_mesh_count; ++i) {
 
-        upload_resources(&indices_upload_resource_info, triangle_mesh.indices);
+                struct gltf_mesh_info *mesh_info = node_info[i].mesh_info;
 
-        rec_copy_buffer_region_cmd(&copy_cmd_list_info,
-                &indices_gpu_resource_info, &indices_upload_resource_info);
+                struct gltf_primitive_info *primitive_info;
+                primitive_info = &mesh_info->primitive_info;
+
+                struct gltf_attribute_info *attribute_info;
+                attribute_info = &primitive_info->attribute_info;
+
+                // Create vertex resource
+                // First resource for vertices on the GPU for shader usage
+                create_wstring(vert_gpu_resource_info[i].name,
+                        L"Vert GPU resource %d", i);
+                vert_gpu_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                vert_gpu_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                vert_gpu_resource_info[i].width =
+                        attribute_info->attribute_data_size;
+                vert_gpu_resource_info[i].height = 1;
+                vert_gpu_resource_info[i].mip_levels = 1;
+                vert_gpu_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                vert_gpu_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                vert_gpu_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
+                vert_gpu_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_COMMON;
+                create_resource(&device_info, &vert_gpu_resource_info[i]);
+
+                // Resource for uploading vertices from CPU to GPU
+                create_wstring(vert_upload_resource_info[i].name,
+                        L"Vert upload resource %d", i);
+                vert_upload_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
+                vert_upload_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                vert_upload_resource_info[i].width =
+                        attribute_info->attribute_data_size;
+                vert_upload_resource_info[i].height = 1;
+                vert_upload_resource_info[i].mip_levels = 1;
+                vert_upload_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                vert_upload_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                vert_upload_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
+                vert_upload_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_GENERIC_READ;
+                create_resource(&device_info, &vert_upload_resource_info[i]);
+
+                // Copy triangle vertex data from cpu to upload resource
+                upload_resources(&vert_upload_resource_info[i],
+                        attribute_info->attribute_data);
+
+                // Copy vertex data from upload resource to gpu shader resource
+                rec_copy_buffer_region_cmd(&copy_cmd_list_info,
+                        &vert_gpu_resource_info[i],
+                        &vert_upload_resource_info[i]);
+
+                // Resource for index buffer on the GPU for shader usage
+                create_wstring(indices_gpu_resource_info[i].name,
+                        L"Indices GPU resource %d", i);
+                indices_gpu_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                indices_gpu_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                indices_gpu_resource_info[i].width = primitive_info->index_size;
+                indices_gpu_resource_info[i].height = 1;
+                indices_gpu_resource_info[i].mip_levels = 1;
+                indices_gpu_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                indices_gpu_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                indices_gpu_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
+                indices_gpu_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_COMMON;
+                create_resource(&device_info, &indices_gpu_resource_info[i]);
+
+                // Resource for uploading indices from CPU to GPU
+                create_wstring(indices_upload_resource_info[i].name,
+                        L"Indices upload resource %d", i);
+                indices_upload_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
+                indices_upload_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                indices_upload_resource_info[i].width =
+                        primitive_info->index_size;
+                indices_upload_resource_info[i].height = 1;
+                indices_upload_resource_info[i].mip_levels = 1;
+                indices_upload_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                indices_upload_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                indices_upload_resource_info[i].flags =
+                        D3D12_RESOURCE_FLAG_NONE;
+                indices_upload_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_GENERIC_READ;
+                create_resource(&device_info, &indices_upload_resource_info[i]);
+
+                upload_resources(&indices_upload_resource_info[i],
+                        primitive_info->index_data);
+
+                rec_copy_buffer_region_cmd(&copy_cmd_list_info,
+                        &indices_gpu_resource_info[i],
+                        &indices_upload_resource_info[i]);
+
+                vert_input_info[i].attribute_count =
+                        (UINT) attribute_info->attribute_type_count;
+                setup_vertex_input(attribute_info->attribute_type_names,
+                attribute_info->attribute_type_data_format, &vert_input_info[i]);
+        }
 
         // Create depth buffer descriptor 
         struct gpu_descriptor_info dsv_descriptor_info;
@@ -279,8 +337,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Create depth buffer resource
         struct gpu_resource_info *dsv_resource_info;
-        dsv_resource_info = malloc(
-                dsv_descriptor_info.num_descriptors *
+        dsv_resource_info = malloc(dsv_descriptor_info.num_descriptors *
                 sizeof (struct gpu_resource_info));
         for (UINT i = 0; i < dsv_descriptor_info.num_descriptors; ++i) {
                 create_wstring(dsv_resource_info[i].name, L"DSV resource %d");
@@ -314,43 +371,41 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         pix_shader_info.shader_target = "ps_6_5";
         compile_shader(&pix_shader_info);
 
-        // Setup vertex input layout
-        #define ATTRIBUTE_COUNT 2
-        LPCSTR attribute_names[ATTRIBUTE_COUNT] = { "POSITION", "TEXCOORD" };
-        DXGI_FORMAT attribute_formats[ATTRIBUTE_COUNT] = {
-                triangle_mesh.vertex_pos_format,
-                DXGI_FORMAT_R32G32_FLOAT
-        };
-
-        struct gpu_vert_input_info vert_input_info;
-        vert_input_info.attribute_count = ATTRIBUTE_COUNT;
-        setup_vertex_input(attribute_names, attribute_formats,
-                &vert_input_info);
-
         // Create root signature
-        #define NUM_GRAPHICS_ROOT_PARAM 3
+        #define NUM_GRAPHICS_ROOT_PARAM 4
         struct gpu_root_param_info graphics_root_param_infos[NUM_GRAPHICS_ROOT_PARAM];
 
         // Layout of root sig
-        #define CBV_GRAPHICS_ROOT_PARAM_INDEX 0
-        #define SRV_GRAPHICS_ROOT_PARAM_INDEX 1
-        #define SAMPLER_GRAPHICS_ROOT_PARAM_INDEX 2
+        #define PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX 0
+        #define PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX 1
+        #define SRV_GRAPHICS_ROOT_PARAM_INDEX 2
+        #define SAMPLER_GRAPHICS_ROOT_PARAM_INDEX 3
 
-        graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].range_type =
+        graphics_root_param_infos[PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
-        graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
+        graphics_root_param_infos[PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
+        graphics_root_param_infos[PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX].base_shader_register = 0;
+        graphics_root_param_infos[PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
+                D3D12_SHADER_VISIBILITY_VERTEX;
+
+        graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].range_type =
+                D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
+        graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].base_shader_register = 1;
+        graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_VERTEX;
 
         graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
+        graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].base_shader_register = 0;
         graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_PIXEL;
 
         graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors = 1;
+        graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].base_shader_register = 0;
         graphics_root_param_infos[SAMPLER_GRAPHICS_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_PIXEL;
 
@@ -381,7 +436,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tmp_rtv_resource_info[swp_chain_info.current_buffer_index].format;
         graphics_pso_info.graphics_pso_info.depth_target_format =
                 dsv_resource_info[swp_chain_info.current_buffer_index].format;
-        create_pso(&device_info, &vert_input_info, &graphics_root_sig_info,
+        create_pso(&device_info, &vert_input_info[0], &graphics_root_sig_info,
                 &graphics_pso_info);
 
         // Now we need to create a view port for the screen we are going to be drawing to
@@ -412,7 +467,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         create_sampler(&device_info, &sampler_descriptor_info);
 
         // Create constant buffer and texture resource descriptor
-        UINT num_graphics_cbv_srv_uav_descriptors = graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors +
+        UINT num_graphics_cbv_srv_uav_descriptors =
+                (graphics_root_param_infos[PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors * (UINT) gltf_mesh_count) +
+                graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors +
                 graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
         struct gpu_descriptor_info graphics_cbv_srv_uav_descriptor_info;
         create_wstring(graphics_cbv_srv_uav_descriptor_info.name,
@@ -425,42 +482,101 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         create_descriptor(&device_info, &graphics_cbv_srv_uav_descriptor_info);
 
-        #define CBV_GRAPHICS_DESCRIPTOR_INDEX 0
-        #define SRV_GRAPHICS_DESCRIPTOR_INDEX 1
+        // This is bad I know.
+        UINT PER_OBJ_CBV_GRAPHICS_DESCRIPTOR_INDEX = 0;
+        UINT PER_FRAME_CBV_GRAPHICS_DESCRIPTOR_INDEX = (UINT) gltf_mesh_count;
+        UINT SRV_GRAPHICS_DESCRIPTOR_INDEX = (UINT) gltf_mesh_count +
+                graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
 
-        // Create constant buffer resource
-        struct gpu_resource_info *graphics_cbv_resource_info;
-        graphics_cbv_resource_info = malloc(swp_chain_info.buffer_count *
-                graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors *
+        // Create per obj constant buffer resource
+        // NEED ONE PER MESH!!
+        struct gpu_resource_info *per_obj_graphics_cbv_resource_info;
+        UINT per_obj_descriptor_count = graphics_root_param_infos[PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors *
+                (UINT) gltf_mesh_count;
+        per_obj_graphics_cbv_resource_info = malloc(swp_chain_info.buffer_count *
+                per_obj_descriptor_count * sizeof (struct gpu_resource_info));
+        for (UINT i = 0; i < swp_chain_info.buffer_count; ++i) {
+                for (UINT j = 0;
+                        j < graphics_root_param_infos[PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors *
+                        gltf_mesh_count;
+                        ++j) {
+
+                        UINT index = per_obj_descriptor_count * i + j;
+                        create_wstring(per_obj_graphics_cbv_resource_info[index].name,
+                                L"Per object Graphics CBV resource %d", index);
+                        per_obj_graphics_cbv_resource_info[index].type =
+                                D3D12_HEAP_TYPE_UPLOAD;
+                        per_obj_graphics_cbv_resource_info[index].dimension =
+                                D3D12_RESOURCE_DIMENSION_BUFFER;
+                        per_obj_graphics_cbv_resource_info[index].width =
+                                align_offset(sizeof (node_info[0].world_transform),
+                                256);
+                        per_obj_graphics_cbv_resource_info[index].height = 1;
+                        per_obj_graphics_cbv_resource_info[index].mip_levels = 1;
+                        per_obj_graphics_cbv_resource_info[index].format =
+                                DXGI_FORMAT_UNKNOWN;
+                        per_obj_graphics_cbv_resource_info[index].layout =
+                                D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                        per_obj_graphics_cbv_resource_info[index].flags =
+                                D3D12_RESOURCE_FLAG_NONE;
+                        per_obj_graphics_cbv_resource_info[index].current_state =
+                                D3D12_RESOURCE_STATE_GENERIC_READ;
+                        create_resource(&device_info,
+                                &per_obj_graphics_cbv_resource_info[index]);
+
+                        update_cpu_handle(&graphics_cbv_srv_uav_descriptor_info,
+                                num_graphics_cbv_srv_uav_descriptors * i +
+                                PER_OBJ_CBV_GRAPHICS_DESCRIPTOR_INDEX + j);
+
+                        // Create constant buffer view
+                        create_constant_buffer_view(&device_info,
+                                &graphics_cbv_srv_uav_descriptor_info,
+                                &per_obj_graphics_cbv_resource_info[index]);
+                }
+        }
+
+        // Create per frame constant buffer resource
+        struct gpu_resource_info *per_frame_graphics_cbv_resource_info;
+        per_frame_graphics_cbv_resource_info = malloc(swp_chain_info.buffer_count *
+                graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors *
                 sizeof (struct gpu_resource_info));
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                graphics_root_param_infos[0].num_descriptors; ++i) {
-                create_wstring(graphics_cbv_resource_info[i].name,
-                        L"Graphics CBV resource %d", i);
-                graphics_cbv_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
-                graphics_cbv_resource_info[i].dimension =
+                graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
+
+                create_wstring(per_frame_graphics_cbv_resource_info[i].name,
+                        L"Per frame Graphics CBV resource %d", i);
+                per_frame_graphics_cbv_resource_info[i].type =
+                        D3D12_HEAP_TYPE_UPLOAD;
+                per_frame_graphics_cbv_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
-                graphics_cbv_resource_info[i].width =
+                per_frame_graphics_cbv_resource_info[i].width =
                         align_offset(sizeof (cam_info.pv_mat), 256);
-                graphics_cbv_resource_info[i].height = 1;
-                graphics_cbv_resource_info[i].mip_levels = 1;
-                graphics_cbv_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
-                graphics_cbv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-                graphics_cbv_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
-                graphics_cbv_resource_info[i].current_state =
+                per_frame_graphics_cbv_resource_info[i].height = 1;
+                per_frame_graphics_cbv_resource_info[i].mip_levels = 1;
+                per_frame_graphics_cbv_resource_info[i].format =
+                        DXGI_FORMAT_UNKNOWN;
+                per_frame_graphics_cbv_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                per_frame_graphics_cbv_resource_info[i].flags =
+                        D3D12_RESOURCE_FLAG_NONE;
+                per_frame_graphics_cbv_resource_info[i].current_state =
                         D3D12_RESOURCE_STATE_GENERIC_READ;
-                create_resource(&device_info, &graphics_cbv_resource_info[i]);
+                create_resource(&device_info,
+                        &per_frame_graphics_cbv_resource_info[i]);
 
                 // Upload constant buffer resource
-                upload_resources(&graphics_cbv_resource_info[i], cam_info.pv_mat);
+                upload_resources(&per_frame_graphics_cbv_resource_info[i],
+                        cam_info.pv_mat);
 
                 update_cpu_handle(&graphics_cbv_srv_uav_descriptor_info,
-                        num_graphics_cbv_srv_uav_descriptors * i + CBV_GRAPHICS_DESCRIPTOR_INDEX); // 0, 2
+                        num_graphics_cbv_srv_uav_descriptors * i +
+                        PER_FRAME_CBV_GRAPHICS_DESCRIPTOR_INDEX);
 
                 // Create constant buffer view
                 create_constant_buffer_view(&device_info,
                         &graphics_cbv_srv_uav_descriptor_info,
-                        &graphics_cbv_resource_info[i]);
+                        &per_frame_graphics_cbv_resource_info[i]);
         }
 
         // Get checker board texture material
@@ -492,22 +608,26 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 sizeof (struct gpu_resource_info));
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
                 create_wstring(tex_resource_info[i].name,
                         L"Tex resource %d", i);
                 tex_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
-                tex_resource_info[i].dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                tex_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_TEXTURE2D;
                 tex_resource_info[i].width = 256;
                 tex_resource_info[i].height = 256;
                 tex_resource_info[i].mip_levels = 1;
                 tex_resource_info[i].format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 tex_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
                 tex_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
-                tex_resource_info[i].current_state = D3D12_RESOURCE_STATE_COMMON;
+                tex_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_COMMON;
                 create_resource(&device_info, &tex_resource_info[i]);
 
                 update_cpu_handle(&graphics_cbv_srv_uav_descriptor_info,
-                        num_graphics_cbv_srv_uav_descriptors * i + SRV_GRAPHICS_DESCRIPTOR_INDEX); // 1, 3
+                        num_graphics_cbv_srv_uav_descriptors * i +
+                        SRV_GRAPHICS_DESCRIPTOR_INDEX);
 
                 // Create shader resource view
                 struct gpu_view_info tex_view_info;
@@ -534,7 +654,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         wait_for_fence_on_gpu(&render_queue_info, &fence_info,
                 swp_chain_info.current_buffer_index);
 
-        #define MAX_RESOURCE_TRANSITION_COUNT 10
+        #define MAX_RESOURCE_TRANSITION_COUNT 100
         struct gpu_resource_info *transition_resource_info_list[MAX_RESOURCE_TRANSITION_COUNT];
         D3D12_RESOURCE_STATES transition_resource_states_list[MAX_RESOURCE_TRANSITION_COUNT];
 
@@ -549,16 +669,22 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         }
 
-        transition_resource_info_list[resource_transition_index] = &vert_gpu_resource_info;
-        transition_resource_states_list[resource_transition_index++] =
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        for (UINT i = 0; i < gltf_mesh_count; ++i) {
 
-        transition_resource_info_list[resource_transition_index] = &indices_gpu_resource_info;
-        transition_resource_states_list[resource_transition_index++] =
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                transition_resource_info_list[resource_transition_index] =
+                        &vert_gpu_resource_info[i];
+                transition_resource_states_list[resource_transition_index++] =
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-        transition_resources(&render_cmd_list_info, transition_resource_info_list,
-                transition_resource_states_list, resource_transition_index);
+                transition_resource_info_list[resource_transition_index] =
+                        &indices_gpu_resource_info[i];
+                transition_resource_states_list[resource_transition_index++] =
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        }
+
+        transition_resources(&render_cmd_list_info,
+                transition_resource_info_list, transition_resource_states_list,
+                resource_transition_index);
 
         // Compile compute shader
         struct gpu_shader_info comp_shader_info;
@@ -578,25 +704,28 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors = 1;
+        compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].base_shader_register = 0;
         compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_ALL;
 
         compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors = 1;
+        compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].base_shader_register = 0;
         compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_ALL;
 
         compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].range_type =
                 D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
         compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors = 1;
+        compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].base_shader_register = 0;
         compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].shader_visbility =
                 D3D12_SHADER_VISIBILITY_ALL;
 
         struct gpu_root_sig_info compute_root_sig_info;
         create_wstring(compute_root_sig_info.name, L"Compute Root sig");
-        create_root_sig(&device_info, compute_root_param_infos, NUM_COMPUTE_ROOT_PARAM,
-                &compute_root_sig_info);
+        create_root_sig(&device_info, compute_root_param_infos,
+                NUM_COMPUTE_ROOT_PARAM, &compute_root_sig_info);
 
         // Create compute pipeline state object
         struct gpu_pso_info compute_pso_info;
@@ -620,12 +749,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         compute_cbv_srv_uav_descriptor_info.type =
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         compute_cbv_srv_uav_descriptor_info.num_descriptors =
-                swp_chain_info.buffer_count * num_compute_cbv_srv_uav_descriptors;
+                swp_chain_info.buffer_count *
+                num_compute_cbv_srv_uav_descriptors;
         compute_cbv_srv_uav_descriptor_info.flags =
                 D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         create_descriptor(&device_info, &compute_cbv_srv_uav_descriptor_info);
 
-        vec2 window_bounds = { (float) wnd_info.width, (float) wnd_info.height };
+        vec2 window_bounds = { (float) wnd_info.width,
+                (float) wnd_info.height };
 
         #define CBV_COMPUTE_DESCRIPTOR_INDEX 0
         #define SRV_COMPUTE_DESCRIPTOR_INDEX 1
@@ -648,14 +779,12 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 compute_cbv_resource_info[i].height = 1;
                 compute_cbv_resource_info[i].mip_levels = 1;
                 compute_cbv_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
-                compute_cbv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                compute_cbv_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 compute_cbv_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
                 compute_cbv_resource_info[i].current_state =
                         D3D12_RESOURCE_STATE_GENERIC_READ;
                 create_resource(&device_info, &compute_cbv_resource_info[i]);
-
-                // Upload constant buffer resource
-                upload_resources(&compute_cbv_resource_info[i], window_bounds);
 
                 update_cpu_handle(&compute_cbv_srv_uav_descriptor_info,
                         num_compute_cbv_srv_uav_descriptors * i +
@@ -669,92 +798,123 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Create BLAS RTX acceleration struct.
         // This takes in all the mesh data
-        struct gpu_dxr_info blas_info;
-        create_blas_prebuild_info(&device_info, &triangle_mesh, &vert_gpu_resource_info,
-                &indices_gpu_resource_info, &blas_info);
+        struct gpu_resource_info *blas_dest_resource_info;
+        struct gpu_resource_info *blas_scratch_resource_info;
 
-        struct gpu_resource_info blas_dest_resource_info;
-        create_wstring(blas_dest_resource_info.name,
-                L"BLAS Dest resource");
-        blas_dest_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
-        blas_dest_resource_info.dimension =
-                D3D12_RESOURCE_DIMENSION_BUFFER;
-        blas_dest_resource_info.width =
-                blas_info.prebuild_info.ResultDataMaxSizeInBytes;
-        blas_dest_resource_info.height = 1;
-        blas_dest_resource_info.mip_levels = 1;
-        blas_dest_resource_info.format = DXGI_FORMAT_UNKNOWN;
-        blas_dest_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        blas_dest_resource_info.flags =
-                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-        blas_dest_resource_info.current_state =
-                D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-        create_resource(&device_info, &blas_dest_resource_info);
+        blas_dest_resource_info = malloc(gltf_mesh_count *
+                sizeof (struct gpu_resource_info));
+        blas_scratch_resource_info = malloc(gltf_mesh_count *
+                sizeof (struct gpu_resource_info));
 
-        struct gpu_resource_info blas_scratch_resource_info;
-        create_wstring(blas_scratch_resource_info.name,
-                L"BLAS Scratch resource");
-        blas_scratch_resource_info.type = D3D12_HEAP_TYPE_DEFAULT;
-        blas_scratch_resource_info.dimension =
-                D3D12_RESOURCE_DIMENSION_BUFFER;
-        blas_scratch_resource_info.width =
-                blas_info.prebuild_info.ScratchDataSizeInBytes;
-        blas_scratch_resource_info.height = 1;
-        blas_scratch_resource_info.mip_levels = 1;
-        blas_scratch_resource_info.format = DXGI_FORMAT_UNKNOWN;
-        blas_scratch_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        blas_scratch_resource_info.flags =
-                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-        blas_scratch_resource_info.current_state =
-                D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        create_resource(&device_info, &blas_scratch_resource_info);
-
-        rec_build_dxr_acceleration_struct(&render_cmd_list_info,
-                &blas_dest_resource_info, &blas_scratch_resource_info, NULL,
-                &blas_info);
-
-        transition_resource_info_list[0] = &vert_gpu_resource_info;
-        transition_resource_info_list[1] = &indices_gpu_resource_info;
-
-        transition_resource_states_list[0] =
-                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-        transition_resource_states_list[1] =
-                D3D12_RESOURCE_STATE_INDEX_BUFFER;
-
-        transition_resources(&render_cmd_list_info, transition_resource_info_list,
-                transition_resource_states_list, 2);
+        struct gpu_dxr_info *blas_info;
+        blas_info = malloc(gltf_mesh_count * sizeof (struct gpu_dxr_info));
 
         struct gpu_resource_info *uav_barrier_resource_info_list[MAX_RESOURCE_TRANSITION_COUNT];
-        uav_barrier_resource_info_list[0] = &blas_dest_resource_info;
-        uav_barrier(&render_cmd_list_info, uav_barrier_resource_info_list, 1);
 
+        resource_transition_index = 0;
+        UINT uav_barrier_index = 0;
+        for (UINT i = 0; i < gltf_mesh_count; ++i) {
+
+                struct gltf_mesh_info *mesh_info = node_info[i].mesh_info;
+
+                struct gltf_primitive_info *primitive_info;
+                primitive_info = &mesh_info->primitive_info;
+
+                create_blas_prebuild_info(&device_info, primitive_info,
+                &vert_gpu_resource_info[i], &indices_gpu_resource_info[i],
+                &blas_info[i]);
+
+                create_wstring(blas_dest_resource_info[i].name,
+                        L"BLAS Dest resource %d", i);
+                blas_dest_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                blas_dest_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                blas_dest_resource_info[i].width =
+                        blas_info[i].prebuild_info.ResultDataMaxSizeInBytes;
+                blas_dest_resource_info[i].height = 1;
+                blas_dest_resource_info[i].mip_levels = 1;
+                blas_dest_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                blas_dest_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                blas_dest_resource_info[i].flags =
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                blas_dest_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+                create_resource(&device_info, &blas_dest_resource_info[i]);
+
+                create_wstring(blas_scratch_resource_info[i].name,
+                        L"BLAS Scratch resource %d", i);
+                blas_scratch_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
+                blas_scratch_resource_info[i].dimension =
+                        D3D12_RESOURCE_DIMENSION_BUFFER;
+                blas_scratch_resource_info[i].width =
+                        blas_info[i].prebuild_info.ScratchDataSizeInBytes;
+                blas_scratch_resource_info[i].height = 1;
+                blas_scratch_resource_info[i].mip_levels = 1;
+                blas_scratch_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                blas_scratch_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                blas_scratch_resource_info[i].flags =
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                blas_scratch_resource_info[i].current_state =
+                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                create_resource(&device_info, &blas_scratch_resource_info[i]);
+
+                rec_build_dxr_acceleration_struct(&render_cmd_list_info,
+                        &blas_dest_resource_info[i],
+                        &blas_scratch_resource_info[i], NULL,
+                        &blas_info[i]);
+
+                transition_resource_info_list[resource_transition_index] =
+                        &vert_gpu_resource_info[i];
+                transition_resource_info_list[resource_transition_index + 1] =
+                        &indices_gpu_resource_info[i];
+
+                transition_resource_states_list[resource_transition_index] =
+                        D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+                transition_resource_states_list[resource_transition_index + 1] =
+                        D3D12_RESOURCE_STATE_INDEX_BUFFER;
+
+                resource_transition_index += 2;
+
+                uav_barrier_resource_info_list[uav_barrier_index++] = &blas_dest_resource_info[i];
+        }
+
+        transition_resources(&render_cmd_list_info, transition_resource_info_list,
+                        transition_resource_states_list, resource_transition_index);
+
+        uav_barrier(&render_cmd_list_info,
+                uav_barrier_resource_info_list, uav_barrier_index);
+
+        // Should be able to hold instance desc for every mesh
         struct gpu_resource_info instance_resource_info;
         create_wstring(instance_resource_info.name, L"TLAS Instance resource");
         instance_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
-        instance_resource_info.dimension =
-                D3D12_RESOURCE_DIMENSION_BUFFER;
+        instance_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         instance_resource_info.width =
-                sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
+                align_offset(gltf_mesh_count *
+                sizeof (D3D12_RAYTRACING_INSTANCE_DESC), 16);
         instance_resource_info.height = 1;
         instance_resource_info.mip_levels = 1;
         instance_resource_info.format = DXGI_FORMAT_UNKNOWN;
         instance_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        instance_resource_info.flags =
-                D3D12_RESOURCE_FLAG_NONE;
+        instance_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
         instance_resource_info.current_state =
                 D3D12_RESOURCE_STATE_GENERIC_READ;
         create_resource(&device_info, &instance_resource_info);
 
         struct gpu_dxr_info tlas_info;
-        create_tlas_prebuild_info(&device_info, &blas_dest_resource_info,
-                &instance_resource_info, &tlas_info);
+        create_tlas_prebuild_info(&device_info, gltf_mesh_count, &node_info[0],
+                &blas_dest_resource_info[0], &instance_resource_info,
+                &tlas_info);
 
         struct gpu_resource_info *tlas_dest_resource_info;
         tlas_dest_resource_info = malloc(swp_chain_info.buffer_count *
                 compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors *
                 sizeof (struct gpu_resource_info));
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
                 create_wstring(tlas_dest_resource_info[i].name,
                         L"TLAS Dest resource %d", i);
                 tlas_dest_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
@@ -765,7 +925,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tlas_dest_resource_info[i].height = 1;
                 tlas_dest_resource_info[i].mip_levels = 1;
                 tlas_dest_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
-                tlas_dest_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                tlas_dest_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 tlas_dest_resource_info[i].flags =
                         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                 tlas_dest_resource_info[i].current_state =
@@ -789,7 +950,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tlas_scratch_resource_info[i].height = 1;
                 tlas_scratch_resource_info[i].mip_levels = 1;
                 tlas_scratch_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
-                tlas_scratch_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                tlas_scratch_resource_info[i].layout =
+                        D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 tlas_scratch_resource_info[i].flags =
                         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                 tlas_scratch_resource_info[i].current_state =
@@ -798,18 +960,23 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         }
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
+
                 rec_build_dxr_acceleration_struct(&render_cmd_list_info,
-                        &tlas_dest_resource_info[i], &tlas_scratch_resource_info[i],
-                        &instance_resource_info, &tlas_info);
+                        &tlas_dest_resource_info[i],
+                        &tlas_scratch_resource_info[i], &instance_resource_info,
+                        &tlas_info);
 
                 // UAV write barrier
                 uav_barrier_resource_info_list[0] = &tlas_dest_resource_info[i];
-                uav_barrier(&render_cmd_list_info, uav_barrier_resource_info_list, 1);
+                uav_barrier(&render_cmd_list_info,
+                        uav_barrier_resource_info_list, 1);
         }
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
                 update_cpu_handle(&compute_cbv_srv_uav_descriptor_info,
                         num_compute_cbv_srv_uav_descriptors * i + SRV_COMPUTE_DESCRIPTOR_INDEX); // 1, 4
 
@@ -822,7 +989,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         }
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                compute_root_param_infos[UAV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
                 update_cpu_handle(&compute_cbv_srv_uav_descriptor_info,
                         num_compute_cbv_srv_uav_descriptors * i + UAV_COMPUTE_DESCRIPTOR_INDEX); // 2, 5
 
@@ -837,10 +1005,12 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         LONG_PTR wndproc_data[] = { (LONG_PTR) &wnd_info,
                 (LONG_PTR) &device_info, (LONG_PTR) &present_queue_info,
                 (LONG_PTR) &swp_chain_info, (LONG_PTR) &rtv_descriptor_info,
-                (LONG_PTR) &rtv_resource_info[0], (LONG_PTR) &tmp_rtv_descriptor_info,
+                (LONG_PTR) &rtv_resource_info[0],
+                (LONG_PTR) &tmp_rtv_descriptor_info,
                 (LONG_PTR) &tmp_rtv_resource_info[0], (LONG_PTR) &fence_info,
                 (LONG_PTR) &dsv_descriptor_info, (LONG_PTR) &dsv_resource_info[0],
-                (LONG_PTR) &compute_root_param_infos[0], (LONG_PTR) &compute_cbv_srv_uav_descriptor_info,
+                (LONG_PTR) &compute_root_param_infos[0],
+                (LONG_PTR) &compute_cbv_srv_uav_descriptor_info,
                 (LONG_PTR) &num_compute_cbv_srv_uav_descriptors
         };
         SetWindowLongPtr(wnd_info.hwnd, GWLP_USERDATA, (LONG_PTR) wndproc_data);
@@ -887,22 +1057,31 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 rec_set_graphics_root_sig_cmd(&render_cmd_list_info,
                         &graphics_root_sig_info);
 
+                // Set descriptor heap for sampler
+                rec_set_descriptor_heap_cmd(&render_cmd_list_info,
+                        &sampler_descriptor_info);
+
+                // Set sampler table
+                rec_set_graphics_root_descriptor_table_cmd(
+                        &render_cmd_list_info, SAMPLER_GRAPHICS_ROOT_PARAM_INDEX,
+                        &sampler_descriptor_info);
+
                 // Set descriptor heap for constant buffer and texture resource
                 rec_set_descriptor_heap_cmd(&render_cmd_list_info,
                         &graphics_cbv_srv_uav_descriptor_info);
 
-                // Update gpu handle to cb's position in descriptor heap which will be 0, 2
+                // Update gpu handle to cb's position in descriptor heap
                 update_gpu_handle(&graphics_cbv_srv_uav_descriptor_info,
                         num_graphics_cbv_srv_uav_descriptors *
                         swp_chain_info.current_buffer_index +
-                        CBV_GRAPHICS_DESCRIPTOR_INDEX);
+                        PER_FRAME_CBV_GRAPHICS_DESCRIPTOR_INDEX);
 
                 // Set constant buffer table
                 rec_set_graphics_root_descriptor_table_cmd(
-                        &render_cmd_list_info, CBV_GRAPHICS_ROOT_PARAM_INDEX,
+                        &render_cmd_list_info, PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX,
                         &graphics_cbv_srv_uav_descriptor_info);
 
-                // Update gpu handle to textures srv position in descriptor heap which will be 1, 3
+                // Update gpu handle to textures srv position in descriptor heap
                 update_gpu_handle(&graphics_cbv_srv_uav_descriptor_info,
                         num_graphics_cbv_srv_uav_descriptors *
                         swp_chain_info.current_buffer_index +
@@ -913,26 +1092,46 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         &render_cmd_list_info, SRV_GRAPHICS_ROOT_PARAM_INDEX,
                         &graphics_cbv_srv_uav_descriptor_info);
 
-                // Set descriptor heap for sampler
-                rec_set_descriptor_heap_cmd(&render_cmd_list_info,
-                        &sampler_descriptor_info);
+                for (UINT i = 0; i < gltf_mesh_count; ++i) {
 
-                // Set sampler table
-                rec_set_graphics_root_descriptor_table_cmd(
-                        &render_cmd_list_info, SAMPLER_GRAPHICS_ROOT_PARAM_INDEX,
-                        &sampler_descriptor_info);
+                        // Update gpu handle to cb's position in descriptor heap
+                        update_gpu_handle(&graphics_cbv_srv_uav_descriptor_info,
+                        num_graphics_cbv_srv_uav_descriptors *
+                        swp_chain_info.current_buffer_index +
+                        PER_OBJ_CBV_GRAPHICS_DESCRIPTOR_INDEX + i);
 
-                // Set vertex buffer
-                rec_set_vertex_buffer_cmd(&render_cmd_list_info,
-                        &vert_gpu_resource_info, sizeof (struct vertex));
+                        // Set constant buffer table
+                        rec_set_graphics_root_descriptor_table_cmd(
+                        &render_cmd_list_info, PER_OBJ_CBV_GRAPHICS_ROOT_PARAM_INDEX,
+                        &graphics_cbv_srv_uav_descriptor_info);
 
-                // Set index buffer
-                rec_set_index_buffer_cmd(&render_cmd_list_info,
-                        &indices_gpu_resource_info, &triangle_mesh);
+                        // Upload constant buffer resource
+                        UINT index = per_obj_descriptor_count * swp_chain_info.current_buffer_index + i;
+                        upload_resources(&per_obj_graphics_cbv_resource_info[index],
+                        node_info[i].world_transform[0]);
 
-                // Draw indexed instanced
-                rec_draw_indexed_instance_cmd(&render_cmd_list_info,
-                        triangle_mesh.index_count, 1);
+                        struct gltf_mesh_info *mesh_info = node_info[i].mesh_info;
+
+                        struct gltf_primitive_info *primitive_info;
+                        primitive_info = &mesh_info->primitive_info;
+
+                        struct gltf_attribute_info *attribute_info;
+                        attribute_info = &primitive_info->attribute_info;
+
+                        // Set vertex buffer
+                        rec_set_vertex_buffer_cmd(&render_cmd_list_info,
+                                &vert_gpu_resource_info[i],
+                                (UINT) attribute_info->attribute_data_stride);
+
+                        // Set index buffer
+                        rec_set_index_buffer_cmd(&render_cmd_list_info,
+                                &indices_gpu_resource_info[i],
+                                primitive_info);
+
+                        // Draw indexed instanced
+                        rec_draw_indexed_instance_cmd(&render_cmd_list_info,
+                                (UINT) primitive_info->indices_count, 1);
+                }
 
                 transition_resource_info_list[0] =
                         &tmp_rtv_resource_info[swp_chain_info.current_buffer_index];
@@ -940,7 +1139,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 transition_resource_states_list[0] =
                         D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
-                transition_resources(&render_cmd_list_info, transition_resource_info_list,
+                transition_resources(&render_cmd_list_info,
+                        transition_resource_info_list,
                         transition_resource_states_list, 1);
 
                 // Close command list for execution
@@ -1036,7 +1236,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 transition_resource_states_list[1] =
                         D3D12_RESOURCE_STATE_COPY_DEST;
 
-                transition_resources(&present_cmd_list_info, transition_resource_info_list,
+                transition_resources(&present_cmd_list_info,
+                        transition_resource_info_list,
                         transition_resource_states_list, 2);
 
                 // Point render target view cpu handle to correct descriptor in descriptor heap
@@ -1117,25 +1318,34 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         release_resource(&instance_resource_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
                 release_resource(&tlas_scratch_resource_info[i]);
         }
 
         free(tlas_scratch_resource_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                compute_root_param_infos[SRV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
                 release_resource(&tlas_dest_resource_info[i]);
         }
 
         free(tlas_dest_resource_info);
 
-        release_resource(&blas_scratch_resource_info);
+        for (UINT i = 0; i < gltf_mesh_count; ++i) {
 
-        release_resource(&blas_dest_resource_info);
+                release_resource(&blas_scratch_resource_info[i]);
+                release_resource(&blas_dest_resource_info[i]);
+        }
+
+        free(blas_scratch_resource_info);
+        free(blas_dest_resource_info);
+        free(blas_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                compute_root_param_infos[CBV_COMPUTE_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
                 release_resource(&compute_cbv_resource_info[i]);
         }
 
@@ -1152,7 +1362,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         release_shader(&comp_shader_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors; ++i) {
+                graphics_root_param_infos[SRV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
+
                 release_resource(&tex_resource_info[i]);
         }
 
@@ -1163,11 +1375,21 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         release_material(&checkerboard_mat_info);
 
         for (UINT i = 0; i < swp_chain_info.buffer_count *
-                graphics_root_param_infos[CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors; ++i) {
-                release_resource(&graphics_cbv_resource_info[i]);
+                per_obj_descriptor_count; ++i) {
+
+                release_resource(&per_obj_graphics_cbv_resource_info[i]);
         }
 
-        free(graphics_cbv_resource_info);
+        free(per_obj_graphics_cbv_resource_info);
+
+        for (UINT i = 0; i < swp_chain_info.buffer_count *
+                graphics_root_param_infos[PER_FRAME_CBV_GRAPHICS_ROOT_PARAM_INDEX].num_descriptors;
+                ++i) {
+
+                release_resource(&per_frame_graphics_cbv_resource_info[i]);
+        }
+
+        free(per_frame_graphics_cbv_resource_info);
 
         release_descriptor(&graphics_cbv_srv_uav_descriptor_info);
 
@@ -1178,8 +1400,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Release root signature
         release_root_sig(&graphics_root_sig_info);
-
-        free_vertex_input(&vert_input_info);
 
         // Release pixel shader
         release_shader(&pix_shader_info);
@@ -1197,20 +1417,36 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         // Release depth stencl buffer heap
         release_descriptor(&dsv_descriptor_info);
 
-        // Release index buffer upload resource
-        release_resource(&indices_upload_resource_info);
 
-        // Release index buffer resource
-        release_resource(&indices_gpu_resource_info);
+        for (UINT i = 0; i < gltf_mesh_count; ++i) {
 
-        // Release vertex buffer upload resource
-        release_resource(&vert_upload_resource_info);
+                // Release vert input
+                free_vertex_input(&vert_input_info[i]);
 
-        // Release vertex buffer resource
-        release_resource(&vert_gpu_resource_info);
+                // Release index buffer upload resource
+                release_resource(&indices_upload_resource_info[i]);
 
-        // Release triangle data 
-        release_triangle(&triangle_mesh);
+                // Release index buffer resource
+                release_resource(&indices_gpu_resource_info[i]);
+
+                // Release vertex buffer upload resource
+                release_resource(&vert_upload_resource_info[i]);
+
+                // Release vertex buffer resource
+                release_resource(&vert_gpu_resource_info[i]);
+        }
+
+        free(vert_input_info);
+        free(indices_upload_resource_info);
+        free(indices_gpu_resource_info);
+        free(vert_upload_resource_info);
+        free(vert_gpu_resource_info);
+
+        release_gltf_nodes(gltf_node_count, node_info, gltf_pdata->nodes);
+
+        free(node_info);
+
+        release_gltf(gltf_pdata);
 
         // Release render fence
         release_fence(&fence_info);

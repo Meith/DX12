@@ -8,7 +8,6 @@
 #include <d3dcompiler.h>
 #include <dxgidebug.h>
 
-#include "mesh_interface.h"
 
 struct gpu_device_info {
         ID3D12Debug1 *debug1;
@@ -113,9 +112,10 @@ struct gpu_dxr_info {
 };
 
 void create_blas_prebuild_info(struct gpu_device_info *device_info,
-        struct mesh_info *mi, struct gpu_resource_info *vert_info,
+        struct gltf_primitive_info *primitive_info, struct gpu_resource_info *vert_info,
         struct gpu_resource_info *index_info, struct gpu_dxr_info *dxr_info);
 void create_tlas_prebuild_info(struct gpu_device_info *device_info,
+        size_t blas_count, struct gltf_node_info *node_info,
         struct gpu_resource_info *blas_dest_resource_info,
         struct gpu_resource_info *instance_resource_info,
         struct gpu_dxr_info *dxr_info);
@@ -191,7 +191,7 @@ void rec_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info *vert_buffer, UINT stride);
 void rec_set_index_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info *index_buffer,
-        struct mesh_info *mi);
+        struct gltf_primitive_info *primitive_info);
 void rec_dispatch_cmd(struct gpu_cmd_list_info *cmd_list_info,
         UINT thread_group_coun_x, UINT thread_group_coun_y,
         UINT thread_group_coun_z);
@@ -254,6 +254,7 @@ void free_vertex_input(struct gpu_vert_input_info *input_info);
 struct gpu_root_param_info {
         D3D12_DESCRIPTOR_RANGE_TYPE range_type;
         UINT num_descriptors;
+        UINT base_shader_register;
         D3D12_SHADER_VISIBILITY shader_visbility;
 };
 

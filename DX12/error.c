@@ -1,7 +1,7 @@
 #include "error.h"
 
 #include <stdlib.h>
-#include <assert.h>
+
 
 void show_error_if_failed(HRESULT hr)
 {

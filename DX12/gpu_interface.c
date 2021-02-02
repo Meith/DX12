@@ -1,6 +1,8 @@
 #include "gpu_interface.h"
+#include "linmath.h"
 #include "error.h"
 #include "misc.h"
+#include "gltf_interface.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -33,8 +35,9 @@ void create_gpu_device(struct gpu_device_info *device_info)
 
         IDXGIAdapter1 *adapter1;
         for (UINT i = 0;
-            IDXGIFactory5_EnumAdapters1(device_info->factory5, i, &adapter1) != DXGI_ERROR_NOT_FOUND;
-            ++i)
+                IDXGIFactory5_EnumAdapters1(device_info->factory5, i, &adapter1) !=
+                DXGI_ERROR_NOT_FOUND;
+                ++i)
         {
                 DXGI_ADAPTER_DESC1 desc1;
                 result = IDXGIAdapter1_GetDesc1(adapter1, &desc1);
@@ -58,7 +61,7 @@ void create_gpu_device(struct gpu_device_info *device_info)
         }
 
         assert(adapter1 != NULL);
-        IUnknown *final_adapter = (IUnknown *)adapter1;
+        IUnknown *final_adapter = (IUnknown *) adapter1;
         result = D3D12CreateDevice(final_adapter, D3D_FEATURE_LEVEL_12_0,
                 &IID_ID3D12Device5, &device_info->device5);
         show_error_if_failed(result);
@@ -90,7 +93,8 @@ void release_gpu_device(struct gpu_device_info *device_info)
         HRESULT result = DXGIGetDebugInterface1(0, &IID_IDXGIDebug1, &debug1);
         show_error_if_failed(result);
 
-        IDXGIDebug1_ReportLiveObjects(debug1, DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
+        IDXGIDebug1_ReportLiveObjects(debug1, DXGI_DEBUG_ALL,
+                DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
         IDXGIDebug1_Release(debug1);
         #endif
 }
@@ -213,7 +217,7 @@ void upload_resources(struct gpu_resource_info *resource_info, void *src_data)
         show_error_if_failed(result);
 
         memcpy(dst_data, src_data, resource_info->width);
-        
+
         ID3D12Resource_Unmap(resource_info->resource, 0, NULL);
 }
 
@@ -243,7 +247,7 @@ void create_descriptor(struct gpu_device_info *device_info,
                 &descriptor_info->base_cpu_handle);
 
         descriptor_info->cpu_handle = descriptor_info->base_cpu_handle;
-        
+
         ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(
                 descriptor_info->descriptor_heap,
                 &descriptor_info->base_gpu_handle);
@@ -366,7 +370,7 @@ void create_unorderd_access_view(struct gpu_device_info *device_info,
                 default :
                         break;
          };
-        
+
          ID3D12Device5_CreateUnorderedAccessView(device_info->device5,
                 resource_info->resource, NULL, &uav_desc,
                 descriptor_info->cpu_handle);
@@ -379,7 +383,8 @@ void create_shader_resource_view(struct gpu_device_info *device_info,
 {
         D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
         srv_desc.Format = resource_info->format;
-        srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv_desc.Shader4ComponentMapping =
+                D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srv_desc.ViewDimension = view_info->srv_dimension;
 
         // If RTX acc struct, need to set this to null
@@ -395,7 +400,8 @@ void create_shader_resource_view(struct gpu_device_info *device_info,
                         break;
 
                 case D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE:
-                        srv_desc.RaytracingAccelerationStructure.Location = resource_info->gpu_address;
+                        srv_desc.RaytracingAccelerationStructure.Location =
+                                resource_info->gpu_address;
                         resource = NULL;
                 default :
                         break;
@@ -432,21 +438,36 @@ void create_sampler(struct gpu_device_info *device_info,
                 descriptor_info->cpu_handle);
 }
 
-
 void create_blas_prebuild_info(struct gpu_device_info *device_info,
-        struct mesh_info *mi, struct gpu_resource_info *vert_info,
+        struct gltf_primitive_info *primitive_info,
+        struct gpu_resource_info *vert_info,
         struct gpu_resource_info *index_info, struct gpu_dxr_info *dxr_info)
 {
+        struct gltf_attribute_info *attribute_info =
+                &primitive_info->attribute_info;
+
         D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE vert_buffer;
         vert_buffer.StartAddress = vert_info->gpu_address;
-        vert_buffer.StrideInBytes = mi->stride;
+        vert_buffer.StrideInBytes = attribute_info->attribute_data_stride;
 
         D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC triangle_desc;
         triangle_desc.Transform3x4 = (D3D12_GPU_VIRTUAL_ADDRESS) NULL;
-        triangle_desc.IndexFormat = mi->index_format;
-        triangle_desc.VertexFormat = mi->vertex_pos_format;
-        triangle_desc.IndexCount = mi->index_count;
-        triangle_desc.VertexCount = mi->vertex_count;
+        triangle_desc.IndexFormat = primitive_info->index_format;
+
+        UINT POS_INDEX = -1;
+        for (UINT i = 0; i < attribute_info->attribute_type_count; ++i) {
+
+                if (strcmp(attribute_info->attribute_type_names[i], "POSITION")) {
+
+                        POS_INDEX = i;
+                        break;
+                }
+        }
+
+        triangle_desc.VertexFormat =
+                attribute_info->attribute_type_data_format[POS_INDEX];
+        triangle_desc.IndexCount = (UINT) primitive_info->indices_count;
+        triangle_desc.VertexCount = (UINT) attribute_info->attribute_data_count;
         triangle_desc.IndexBuffer = index_info->gpu_address;
         triangle_desc.VertexBuffer = vert_buffer;
 
@@ -467,6 +488,7 @@ void create_blas_prebuild_info(struct gpu_device_info *device_info,
 }
 
 void create_tlas_prebuild_info(struct gpu_device_info *device_info,
+        size_t blas_count, struct gltf_node_info *node_info,
         struct gpu_resource_info *blas_dest_resource_info,
         struct gpu_resource_info *instance_resource_info,
         struct gpu_dxr_info *dxr_info)
@@ -475,23 +497,40 @@ void create_tlas_prebuild_info(struct gpu_device_info *device_info,
                 D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
         dxr_info->struct_inputs.Flags =
                 D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-        dxr_info->struct_inputs.NumDescs = 1;
+        dxr_info->struct_inputs.NumDescs = (UINT) blas_count;
         dxr_info->struct_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 
-        mat4x4 identity_mat;
-        mat4x4_identity(identity_mat);
-        D3D12_RAYTRACING_INSTANCE_DESC* instance_desc;
-        ID3D12Resource_Map(instance_resource_info->resource, 0, NULL,
-                (void **) &instance_desc);
-        memcpy(instance_desc->Transform, &identity_mat,
-                sizeof (instance_desc->Transform));
-        instance_desc->InstanceID = 0;
-        instance_desc->InstanceMask = 0xFF; // ?
-        instance_desc->InstanceContributionToHitGroupIndex = 0;
-        instance_desc->Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-        instance_desc->AccelerationStructure =
-                blas_dest_resource_info->gpu_address;
-        ID3D12Resource_Unmap(instance_resource_info->resource, 0, NULL);
+        D3D12_RANGE read_range = { .Begin = 0, .End = 0 };
+
+        D3D12_RAYTRACING_INSTANCE_DESC *instance_desc = NULL;
+
+        HRESULT result;
+
+        result = ID3D12Resource_Map(instance_resource_info->resource, 0,
+                        &read_range, (void **) &instance_desc);
+        show_error_if_failed(result);
+
+        for (UINT i = 0; i < blas_count; ++i) {
+
+                D3D12_RAYTRACING_INSTANCE_DESC tmp_instance_desc;
+                mat4x4 world_tranform_transpose;
+                mat4x4_transpose(world_tranform_transpose, node_info[i].world_transform);
+                memcpy(tmp_instance_desc.Transform, world_tranform_transpose,
+                sizeof (tmp_instance_desc.Transform));
+                tmp_instance_desc.InstanceID = 0;
+                tmp_instance_desc.InstanceMask = 0xFF; // ?
+                tmp_instance_desc.InstanceContributionToHitGroupIndex = 0;
+                tmp_instance_desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+                tmp_instance_desc.AccelerationStructure =
+                        blas_dest_resource_info[i].gpu_address;
+
+                memcpy(&instance_desc[i], &tmp_instance_desc,
+                        sizeof (D3D12_RAYTRACING_INSTANCE_DESC));
+        }
+
+        D3D12_RANGE write_range = { .Begin = 0, .End = align_offset(blas_count *
+                sizeof (D3D12_RAYTRACING_INSTANCE_DESC), 16) };
+        ID3D12Resource_Unmap(instance_resource_info->resource, 0, &write_range);
 
         dxr_info->struct_inputs.InstanceDescs =
                 instance_resource_info->gpu_address;
@@ -505,8 +544,8 @@ void create_tlas_prebuild_info(struct gpu_device_info *device_info,
 void create_cmd_allocators(struct gpu_device_info *device_info,
         struct gpu_cmd_allocator_info *cmd_allocator_info)
 {
-        cmd_allocator_info->cmd_allocators = malloc(
-                cmd_allocator_info->cmd_allocator_count *
+        cmd_allocator_info->cmd_allocators =
+                malloc(cmd_allocator_info->cmd_allocator_count *
                 sizeof (ID3D12CommandAllocator *));
 
         HRESULT result;
@@ -760,12 +799,12 @@ void rec_set_vertex_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
 
 void rec_set_index_buffer_cmd(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info *index_buffer,
-        struct mesh_info *mi)
+        struct gltf_primitive_info *primitive_info)
 {
         D3D12_INDEX_BUFFER_VIEW index_buffer_view;
         index_buffer_view.BufferLocation = index_buffer->gpu_address;
         index_buffer_view.SizeInBytes = (UINT) index_buffer->width;
-        index_buffer_view.Format = mi->index_format;
+        index_buffer_view.Format = primitive_info->index_format;
 
         ID3D12GraphicsCommandList4_IASetIndexBuffer(
                 cmd_list_info->cmd_list4, &index_buffer_view);
@@ -790,7 +829,7 @@ void transition_resources(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info **resource_info_list,
         D3D12_RESOURCE_STATES *resource_end_state_list, UINT resource_count)
 {
-        #define MAX_RESC_BARRIERS 10
+        #define MAX_RESC_BARRIERS 100
         D3D12_RESOURCE_BARRIER resource_barriers[MAX_RESC_BARRIERS];
         for (UINT i = 0; i < resource_count; ++i) {
                 struct gpu_resource_info *resource_info =
@@ -822,7 +861,7 @@ void transition_resources(struct gpu_cmd_list_info *cmd_list_info,
 void uav_barrier(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info** resource_info_list, UINT resource_count)
 {
-        #define MAX_UAV_BARRIERS 10
+        #define MAX_UAV_BARRIERS 100
         D3D12_RESOURCE_BARRIER resource_barriers[MAX_UAV_BARRIERS];
         for (UINT i = 0; i < resource_count; ++i) {
                 struct gpu_resource_info *resource_info =
@@ -1001,9 +1040,11 @@ void compile_shader(struct gpu_shader_info *shader_info)
                 FILE *fp = NULL;
 
                 char shader_file[64];
-                wcstombs(shader_file, shader_info->shader_file, sizeof(shader_file));
+                wcstombs(shader_file, shader_info->shader_file,
+                        sizeof(shader_file));
                 char shader_object_file[64] = "\0";
-                strncat(shader_object_file, shader_file, strlen(shader_file) - 5);
+                strncat(shader_object_file, shader_file,
+                        strlen(shader_file) - 5);
                 strcat(shader_object_file, ".bin");
 
                 fp = fopen(shader_object_file, "rb");
@@ -1013,8 +1054,10 @@ void compile_shader(struct gpu_shader_info *shader_info)
                 shader_info->shader_byte_code_len = ftell(fp);
                 rewind(fp);
 
-                shader_info->shader_byte_code = malloc(sizeof (byte) * shader_info->shader_byte_code_len);
-                fread(shader_info->shader_byte_code, 1, shader_info->shader_byte_code_len, fp);
+                shader_info->shader_byte_code =
+                        malloc(sizeof (byte) * shader_info->shader_byte_code_len);
+                fread(shader_info->shader_byte_code, 1,
+                        shader_info->shader_byte_code_len, fp);
                 fclose(fp);
         }
 }
@@ -1071,7 +1114,8 @@ void create_root_sig(struct gpu_device_info *device_info,
                         root_param_infos[i].range_type;
                 descriptor_ranges[i].NumDescriptors =
                         root_param_infos[i].num_descriptors;
-                descriptor_ranges[i].BaseShaderRegister = 0;
+                descriptor_ranges[i].BaseShaderRegister =
+                        root_param_infos[i].base_shader_register;
                 descriptor_ranges[i].RegisterSpace = 0;
                 descriptor_ranges[i].OffsetInDescriptorsFromTableStart = 0;
 

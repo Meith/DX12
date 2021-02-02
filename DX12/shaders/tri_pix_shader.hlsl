@@ -3,10 +3,12 @@ SamplerState border_sampler                    : register(s0);
 
 struct pixel_shader_input
 {
-        float2 uv       : TEXCOORD;
+        float3 normal   : NORMAL;
+        float2 texcoord : TEXCOORD;
+        float4 tangent  : TANGENT;
 };
 
 float4 main(pixel_shader_input pi) : SV_TARGET
 {
-        return colour_texture.Sample(border_sampler, pi.uv);
+        return float4(pi.tangent);
 }

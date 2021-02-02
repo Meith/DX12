@@ -30,9 +30,6 @@
     <ClCompile Include="gpu_interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mesh_interface.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="swapchain_interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -40,6 +37,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="material_interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gltf_interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -51,9 +51,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpu_interface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mesh_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="swapchain_inerface.h">
@@ -71,16 +68,22 @@
     <ClInclude Include="camera_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="libs\cgltf\cgltf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gltf_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\tri_comp_shader.hlsl">
+    <CustomBuild Include="shaders\tri_pix_shader.hlsl">
       <Filter>Shader Files</Filter>
-    </None>
-    <None Include="shaders\tri_pix_shader.hlsl">
+    </CustomBuild>
+    <CustomBuild Include="shaders\tri_comp_shader.hlsl">
       <Filter>Shader Files</Filter>
-    </None>
-    <None Include="shaders\tri_vert_shader.hlsl">
+    </CustomBuild>
+    <CustomBuild Include="shaders\tri_vert_shader.hlsl">
       <Filter>Shader Files</Filter>
-    </None>
+    </CustomBuild>
   </ItemGroup>
 </Project>
