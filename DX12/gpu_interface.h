@@ -17,7 +17,7 @@ struct gpu_device_info {
 
 void create_gpu_device(struct gpu_device_info *device_info);
 void release_gpu_device(struct gpu_device_info *device_info);
-
+void get_gpu_device_removed(struct gpu_device_info *device_info);
 
 struct gpu_cmd_queue_info {
         WCHAR name[1024];
@@ -34,10 +34,13 @@ struct gpu_resource_info {
         WCHAR name[1024];
         D3D12_HEAP_TYPE type;
         D3D12_RESOURCE_DIMENSION dimension;
+        UINT64 alignment;
         UINT64 width;
         UINT height;
         UINT16 mip_levels;
         DXGI_FORMAT format;
+        UINT sample_count;
+        UINT sample_quality;
         D3D12_TEXTURE_LAYOUT layout;
         D3D12_RESOURCE_FLAGS flags;
         D3D12_RESOURCE_STATES current_state;
@@ -208,6 +211,16 @@ void rec_build_dxr_acceleration_struct(struct gpu_cmd_list_info *cmd_list_info,
         struct gpu_resource_info *instance_resource_info,
         struct gpu_dxr_info *dxr_info);
 
+struct gpu_sample_positions_info {
+        UINT num_samples_per_pixels;
+        UINT num_pixels;
+        // num_samples_per_pixels * num_pixels
+        D3D12_SAMPLE_POSITION sample_positions[4 * 16];
+};
+
+void rec_set_sample_positions(struct gpu_cmd_list_info *cmd_list_info,
+        struct gpu_sample_positions_info *sample_positions_info,
+        BOOL is_sample_positions_null);
 
 struct gpu_fence_info {
         WCHAR name[1024];
@@ -288,6 +301,8 @@ struct gpu_graphics_pso_info {
         size_t geom_shader_byte_code_len;
         DXGI_FORMAT render_target_format;
         DXGI_FORMAT depth_target_format;
+        UINT sample_count;
+        UINT sample_quality;
 };
 
 struct gpu_compute_pso_info {

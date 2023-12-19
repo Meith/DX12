@@ -53,7 +53,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Create swapchain
         struct swapchain_info swp_chain_info;
-        swp_chain_info.format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        swp_chain_info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swp_chain_info.buffer_count = 2;
         create_swapchain(&wnd_info, &device_info, &present_queue_info,
                 &swp_chain_info);
@@ -103,10 +103,13 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tmp_rtv_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 tmp_rtv_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                tmp_rtv_resource_info[i].alignment = 0;
                 tmp_rtv_resource_info[i].width = wnd_info.width;
                 tmp_rtv_resource_info[i].height = wnd_info.height;
                 tmp_rtv_resource_info[i].mip_levels = 1;
                 tmp_rtv_resource_info[i].format = swp_chain_info.format;
+                tmp_rtv_resource_info[i].sample_count = 1;
+                tmp_rtv_resource_info[i].sample_quality = 0;
                 tmp_rtv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
                 tmp_rtv_resource_info[i].flags =
                         D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
@@ -239,11 +242,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 vert_gpu_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 vert_gpu_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                vert_gpu_resource_info[i].alignment = 0;
                 vert_gpu_resource_info[i].width =
                         attribute_info->attribute_data_size;
                 vert_gpu_resource_info[i].height = 1;
                 vert_gpu_resource_info[i].mip_levels = 1;
                 vert_gpu_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                vert_gpu_resource_info[i].sample_count = 1;
+                vert_gpu_resource_info[i].sample_quality = 0;
                 vert_gpu_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 vert_gpu_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
@@ -257,11 +263,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 vert_upload_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
                 vert_upload_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                vert_upload_resource_info[i].alignment = 0;
                 vert_upload_resource_info[i].width =
                         attribute_info->attribute_data_size;
                 vert_upload_resource_info[i].height = 1;
                 vert_upload_resource_info[i].mip_levels = 1;
                 vert_upload_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                vert_upload_resource_info[i].sample_count = 1;
+                vert_upload_resource_info[i].sample_quality = 0;
                 vert_upload_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 vert_upload_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
@@ -284,10 +293,13 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 indices_gpu_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 indices_gpu_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                indices_gpu_resource_info[i].alignment = 0;
                 indices_gpu_resource_info[i].width = primitive_info->index_size;
                 indices_gpu_resource_info[i].height = 1;
                 indices_gpu_resource_info[i].mip_levels = 1;
                 indices_gpu_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                indices_gpu_resource_info[i].sample_count = 1;
+                indices_gpu_resource_info[i].sample_quality = 0;
                 indices_gpu_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 indices_gpu_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
@@ -301,11 +313,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 indices_upload_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
                 indices_upload_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                indices_upload_resource_info[i].alignment = 0;
                 indices_upload_resource_info[i].width =
                         primitive_info->index_size;
                 indices_upload_resource_info[i].height = 1;
                 indices_upload_resource_info[i].mip_levels = 1;
                 indices_upload_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                indices_upload_resource_info[i].sample_count = 1;
+                indices_upload_resource_info[i].sample_quality = 0;
                 indices_upload_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 indices_upload_resource_info[i].flags =
@@ -343,10 +358,13 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 create_wstring(dsv_resource_info[i].name, L"DSV resource %d");
                 dsv_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 dsv_resource_info[i].dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                dsv_resource_info[i].alignment = 0;
                 dsv_resource_info[i].width = wnd_info.width;
                 dsv_resource_info[i].height = wnd_info.height;
-                dsv_resource_info[i].mip_levels = 0;
-                dsv_resource_info[i].format = DXGI_FORMAT_D32_FLOAT;
+                dsv_resource_info[i].mip_levels = 1;
+                dsv_resource_info[i].format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+                dsv_resource_info[i].sample_count = 1;
+                dsv_resource_info[i].sample_quality = 0;
                 dsv_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
                 dsv_resource_info[i].flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
                 dsv_resource_info[i].current_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
@@ -411,6 +429,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         struct gpu_root_sig_info graphics_root_sig_info;
         create_wstring(graphics_root_sig_info.name, L"Graphics Root sig");
+
         create_root_sig(&device_info, graphics_root_param_infos, NUM_GRAPHICS_ROOT_PARAM,
                 &graphics_root_sig_info);
 
@@ -436,6 +455,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tmp_rtv_resource_info[swp_chain_info.current_buffer_index].format;
         graphics_pso_info.graphics_pso_info.depth_target_format =
                 dsv_resource_info[swp_chain_info.current_buffer_index].format;
+        graphics_pso_info.graphics_pso_info.sample_count = 1;
+        graphics_pso_info.graphics_pso_info.sample_quality = 0;
         create_pso(&device_info, &vert_input_info[0], &graphics_root_sig_info,
                 &graphics_pso_info);
 
@@ -508,6 +529,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                                 D3D12_HEAP_TYPE_UPLOAD;
                         per_obj_graphics_cbv_resource_info[index].dimension =
                                 D3D12_RESOURCE_DIMENSION_BUFFER;
+                        per_obj_graphics_cbv_resource_info[index].alignment = 0;
                         per_obj_graphics_cbv_resource_info[index].width =
                                 align_offset(sizeof (node_info[0].world_transform),
                                 256);
@@ -515,6 +537,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         per_obj_graphics_cbv_resource_info[index].mip_levels = 1;
                         per_obj_graphics_cbv_resource_info[index].format =
                                 DXGI_FORMAT_UNKNOWN;
+                        per_obj_graphics_cbv_resource_info[index].sample_count = 1;
+                        per_obj_graphics_cbv_resource_info[index].sample_quality = 0;
                         per_obj_graphics_cbv_resource_info[index].layout =
                                 D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                         per_obj_graphics_cbv_resource_info[index].flags =
@@ -550,12 +574,15 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                         D3D12_HEAP_TYPE_UPLOAD;
                 per_frame_graphics_cbv_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                per_frame_graphics_cbv_resource_info[i].alignment = 0;
                 per_frame_graphics_cbv_resource_info[i].width =
                         align_offset(sizeof (cam_info.pv_mat), 256);
                 per_frame_graphics_cbv_resource_info[i].height = 1;
                 per_frame_graphics_cbv_resource_info[i].mip_levels = 1;
                 per_frame_graphics_cbv_resource_info[i].format =
                         DXGI_FORMAT_UNKNOWN;
+                per_frame_graphics_cbv_resource_info[i].sample_count = 1;
+                per_frame_graphics_cbv_resource_info[i].sample_quality = 0;
                 per_frame_graphics_cbv_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 per_frame_graphics_cbv_resource_info[i].flags =
@@ -588,10 +615,13 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         create_wstring(tex_upload_resource_info.name, L"Tex upload resource");
         tex_upload_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
         tex_upload_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        tex_upload_resource_info.alignment = 0;
         tex_upload_resource_info.width = checkerboard_mat_info.tex_size;
         tex_upload_resource_info.height = 1;
         tex_upload_resource_info.mip_levels = 1;
         tex_upload_resource_info.format = DXGI_FORMAT_UNKNOWN;
+        tex_upload_resource_info.sample_count = 1;
+        tex_upload_resource_info.sample_quality = 0;
         tex_upload_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         tex_upload_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
         tex_upload_resource_info.current_state =
@@ -615,10 +645,13 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tex_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 tex_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                tex_resource_info[i].alignment = 0;
                 tex_resource_info[i].width = 256;
                 tex_resource_info[i].height = 256;
                 tex_resource_info[i].mip_levels = 1;
                 tex_resource_info[i].format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                tex_resource_info[i].sample_count = 1;
+                tex_resource_info[i].sample_quality = 0;
                 tex_resource_info[i].layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
                 tex_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
                 tex_resource_info[i].current_state =
@@ -774,11 +807,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 compute_cbv_resource_info[i].type = D3D12_HEAP_TYPE_UPLOAD;
                 compute_cbv_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                compute_cbv_resource_info[i].alignment = 0;
                 compute_cbv_resource_info[i].width =
                         align_offset(sizeof (window_bounds), 256);
                 compute_cbv_resource_info[i].height = 1;
                 compute_cbv_resource_info[i].mip_levels = 1;
                 compute_cbv_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                compute_cbv_resource_info[i].sample_count = 1;
+                compute_cbv_resource_info[i].sample_quality = 0;
                 compute_cbv_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 compute_cbv_resource_info[i].flags = D3D12_RESOURCE_FLAG_NONE;
@@ -829,11 +865,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 blas_dest_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 blas_dest_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                blas_dest_resource_info[i].alignment = 0;
                 blas_dest_resource_info[i].width =
                         blas_info[i].prebuild_info.ResultDataMaxSizeInBytes;
                 blas_dest_resource_info[i].height = 1;
                 blas_dest_resource_info[i].mip_levels = 1;
                 blas_dest_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                blas_dest_resource_info[i].sample_count = 1;
+                blas_dest_resource_info[i].sample_quality = 0;
                 blas_dest_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 blas_dest_resource_info[i].flags =
@@ -847,11 +886,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 blas_scratch_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 blas_scratch_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                blas_scratch_resource_info[i].alignment = 0;
                 blas_scratch_resource_info[i].width =
                         blas_info[i].prebuild_info.ScratchDataSizeInBytes;
                 blas_scratch_resource_info[i].height = 1;
                 blas_scratch_resource_info[i].mip_levels = 1;
                 blas_scratch_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                blas_scratch_resource_info[i].sample_count = 1;
+                blas_scratch_resource_info[i].sample_quality = 0;
                 blas_scratch_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 blas_scratch_resource_info[i].flags =
@@ -891,12 +933,15 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         create_wstring(instance_resource_info.name, L"TLAS Instance resource");
         instance_resource_info.type = D3D12_HEAP_TYPE_UPLOAD;
         instance_resource_info.dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        instance_resource_info.alignment = 0;
         instance_resource_info.width =
                 align_offset(gltf_mesh_count *
                 sizeof (D3D12_RAYTRACING_INSTANCE_DESC), 16);
         instance_resource_info.height = 1;
         instance_resource_info.mip_levels = 1;
         instance_resource_info.format = DXGI_FORMAT_UNKNOWN;
+        instance_resource_info.sample_count = 1;
+        instance_resource_info.sample_quality = 0;
         instance_resource_info.layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         instance_resource_info.flags = D3D12_RESOURCE_FLAG_NONE;
         instance_resource_info.current_state =
@@ -920,11 +965,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tlas_dest_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 tlas_dest_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                tlas_dest_resource_info[i].alignment = 0;
                 tlas_dest_resource_info[i].width =
                         tlas_info.prebuild_info.ResultDataMaxSizeInBytes;
                 tlas_dest_resource_info[i].height = 1;
                 tlas_dest_resource_info[i].mip_levels = 1;
                 tlas_dest_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                tlas_dest_resource_info[i].sample_count = 1;
+                tlas_dest_resource_info[i].sample_quality = 0;
                 tlas_dest_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 tlas_dest_resource_info[i].flags =
@@ -945,11 +993,14 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tlas_scratch_resource_info[i].type = D3D12_HEAP_TYPE_DEFAULT;
                 tlas_scratch_resource_info[i].dimension =
                         D3D12_RESOURCE_DIMENSION_BUFFER;
+                tlas_scratch_resource_info[i].alignment = 0;
                 tlas_scratch_resource_info[i].width =
                         tlas_info.prebuild_info.ScratchDataSizeInBytes;
                 tlas_scratch_resource_info[i].height = 1;
                 tlas_scratch_resource_info[i].mip_levels = 1;
                 tlas_scratch_resource_info[i].format = DXGI_FORMAT_UNKNOWN;
+                tlas_scratch_resource_info[i].sample_count = 1;
+                tlas_scratch_resource_info[i].sample_quality = 0;
                 tlas_scratch_resource_info[i].layout =
                         D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
                 tlas_scratch_resource_info[i].flags =
@@ -1015,6 +1066,16 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         };
         SetWindowLongPtr(wnd_info.hwnd, GWLP_USERDATA, (LONG_PTR) wndproc_data);
 
+        struct gpu_sample_positions_info sample_positions_info;
+        sample_positions_info.num_pixels = 1;
+        sample_positions_info.num_samples_per_pixels = 1;
+        sample_positions_info.sample_positions[0].X = 1;
+        sample_positions_info.sample_positions[0].Y = 1;
+
+        struct gpu_sample_positions_info null_sample_positions_info;
+        null_sample_positions_info.num_pixels = 0;
+        null_sample_positions_info.num_samples_per_pixels = 0;
+
         UINT queued_window_msg = WM_NULL;
         do {
                 queued_window_msg = window_message_loop();
@@ -1034,9 +1095,21 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 rec_clear_rtv_cmd(&render_cmd_list_info,
                         &tmp_rtv_descriptor_info, clear_color);
 
+                rec_set_sample_positions(&render_cmd_list_info,
+                        &sample_positions_info, FALSE);
+
                 // Clear depth target
                 rec_clear_dsv_cmd(&render_cmd_list_info,
                         &dsv_descriptor_info);
+
+                rec_set_sample_positions(&render_cmd_list_info,
+                        &null_sample_positions_info, TRUE);
+
+                rec_set_sample_positions(&render_cmd_list_info,
+                        &null_sample_positions_info, TRUE);
+
+                rec_set_sample_positions(&render_cmd_list_info,
+                        &sample_positions_info, FALSE);
 
                 // Set pipeline state
                 rec_set_pipeline_state_cmd(&render_cmd_list_info,
@@ -1416,7 +1489,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
         // Release depth stencl buffer heap
         release_descriptor(&dsv_descriptor_info);
-
 
         for (UINT i = 0; i < gltf_mesh_count; ++i) {
 

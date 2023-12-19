@@ -29,7 +29,7 @@ void create_gpu_device(struct gpu_device_info *device_info)
         #endif
 
         // Create a DXGI factory
-        result = CreateDXGIFactory2(0, &IID_IDXGIFactory5,
+        result = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, &IID_IDXGIFactory5,
                 &device_info->factory5);
         show_error_if_failed(result);
 
@@ -99,6 +99,12 @@ void release_gpu_device(struct gpu_device_info *device_info)
         #endif
 }
 
+void get_gpu_device_removed(struct gpu_device_info* device_info)
+{
+    HRESULT result = ID3D12Device5_GetDeviceRemovedReason(device_info->device5);
+    show_error_if_failed(result);
+}
+
 
 void create_cmd_queue(struct gpu_device_info *device_info,
         struct gpu_cmd_queue_info *cmd_queue_info)
@@ -140,14 +146,14 @@ void create_resource(struct gpu_device_info *device_info,
 
         D3D12_RESOURCE_DESC resource_desc;
         resource_desc.Dimension = resource_info->dimension;
-        resource_desc.Alignment = 0;
+        resource_desc.Alignment = resource_info->alignment;
         resource_desc.Width = resource_info->width;
         resource_desc.Height = resource_info->height;
         resource_desc.DepthOrArraySize = 1;
         resource_desc.MipLevels = resource_info->mip_levels;
         resource_desc.Format = resource_info->format;
-        resource_desc.SampleDesc.Count = 1;
-        resource_desc.SampleDesc.Quality = 0;
+        resource_desc.SampleDesc.Count = resource_info->sample_count;
+        resource_desc.SampleDesc.Quality = resource_info->sample_quality;
         resource_desc.Layout = resource_info->layout;
         resource_desc.Flags = resource_info->flags;
 
@@ -917,6 +923,16 @@ void rec_build_dxr_acceleration_struct(struct gpu_cmd_list_info *cmd_list_info,
                 cmd_list_info->cmd_list4, &acceleration_structure_desc, 0u, NULL);
 }
 
+void rec_set_sample_positions(struct gpu_cmd_list_info *cmd_list_info,
+        struct gpu_sample_positions_info *sample_positions_info,
+        BOOL is_sample_positions_null)
+{
+        ID3D12GraphicsCommandList4_SetSamplePositions(cmd_list_info->cmd_list4,
+                sample_positions_info->num_samples_per_pixels,
+                sample_positions_info->num_pixels,
+                is_sample_positions_null ? NULL : sample_positions_info->sample_positions);
+}
+
 
 void create_fence(struct gpu_device_info *device_info, 
         struct gpu_fence_info *fence_info)
@@ -1307,8 +1323,8 @@ static void create_graphics_pso(struct gpu_device_info *device_info,
         }
         graphics_pso_desc.DSVFormat =
                 pso_info->graphics_pso_info.depth_target_format;
-        graphics_pso_desc.SampleDesc.Count = 1;
-        graphics_pso_desc.SampleDesc.Quality = 0;
+        graphics_pso_desc.SampleDesc.Count = pso_info->graphics_pso_info.sample_count;
+        graphics_pso_desc.SampleDesc.Quality = pso_info->graphics_pso_info.sample_quality;
         graphics_pso_desc.NodeMask = 0;
         graphics_pso_desc.CachedPSO.pCachedBlob = NULL;
         graphics_pso_desc.CachedPSO.CachedBlobSizeInBytes = 0;

@@ -76,6 +76,9 @@ void process_gltf_primitives(struct gltf_primitive_info *primitive_info,
                 &index_buffer_data[index_buffer_view->offset +
                 index_accessor->offset],
                 primitive_info->index_size);
+
+        /*process_gltf_materials(&primitive_info->material_info,
+                primitive_data->material);*/
 }
 
 void process_gltf_attributes(struct gltf_attribute_info *attribute_info,
@@ -251,6 +254,82 @@ DXGI_FORMAT process_gltf_format(enum cgltf_type type,
         }
 }
 
+void process_gltf_materials(struct gltf_material_info *material_info,
+        struct cgltf_material *material_data)
+{
+        if (material_data->has_pbr_metallic_roughness) {
+
+                cgltf_pbr_metallic_roughness *pbr_metallic_roughness =
+                        &material_data->pbr_metallic_roughness;
+
+                material_info->base_texture_file_name =
+                        process_gltf_textures(&pbr_metallic_roughness->base_color_texture);
+
+                material_info->metallic_roughness_texture_file_name =
+                        process_gltf_textures(&pbr_metallic_roughness->metallic_roughness_texture);
+
+                memcpy(material_info->base_color_factor,
+                        pbr_metallic_roughness->base_color_factor,
+                        sizeof (material_info->base_color_factor));
+                material_info->metallic_factor =
+                        pbr_metallic_roughness->metallic_factor;
+                material_info->roughness_factor =
+                        pbr_metallic_roughness->roughness_factor;
+        }
+
+        if (material_data->has_pbr_specular_glossiness) {
+
+                cgltf_pbr_specular_glossiness *pbr_specular_glossiness =
+                        &material_data->pbr_specular_glossiness;
+
+                material_info->diffuse_texture_file_name =
+                        process_gltf_textures(&pbr_specular_glossiness->diffuse_texture);
+
+                material_info->specular_glossiness_texture_file_name =
+                        process_gltf_textures(&pbr_specular_glossiness->specular_glossiness_texture);
+
+                memcpy(material_info->diffuse_factor,
+                        pbr_specular_glossiness->diffuse_factor,
+                        sizeof (material_info->diffuse_factor));
+                memcpy(material_info->specular_factor,
+                        pbr_specular_glossiness->specular_factor,
+                        sizeof (material_info->specular_factor));
+                material_info->glossiness_factor =
+                        pbr_specular_glossiness->glossiness_factor;
+        }
+
+        material_info->normal_texture_file_name =
+                process_gltf_textures(&material_data->normal_texture);
+
+        material_info->occlusion_texture_file_name =
+                process_gltf_textures(&material_data->occlusion_texture);
+
+        material_info->emissive_texture_file_name =
+                process_gltf_textures(&material_data->emissive_texture);
+
+        memcpy(material_info->emissive_factor, material_data->emissive_factor,
+                sizeof (material_info->emissive_factor));
+        material_info->alpha_blend_mode = material_data->alpha_mode;
+        material_info->alpha_cutoff = material_data->alpha_cutoff;
+        material_info->double_sided = material_data->double_sided;
+        material_info->unlit = material_data->unlit;
+ }
+
+char* process_gltf_textures(cgltf_texture_view* texture_view)
+{
+        cgltf_texture* texture = texture_view->texture;
+
+        cgltf_image* image = texture->image;
+
+        size_t texture_file_name_len = strlen(image->uri);
+
+        char* texture_file_name = malloc(texture_file_name_len + 1 * sizeof (char));
+        strcpy(texture_file_name, image->uri);
+        texture_file_name[texture_file_name_len] = '\0';
+
+        return texture_file_name;
+}
+
 void release_gltf_nodes(size_t node_count, struct gltf_node_info *node_info,
         struct cgltf_node *node_data)
 {
@@ -258,37 +337,45 @@ void release_gltf_nodes(size_t node_count, struct gltf_node_info *node_info,
 
                 if (node_data[i].mesh == NULL) continue;
 
-                release_gltf_meshes(node_info[j].mesh_info, node_data[i].mesh);
+                release_gltf_meshes(node_info[j].mesh_info);
 
                 free(node_info[j].mesh_info);
                 ++j;
         }
 }
 
-void release_gltf_meshes(struct gltf_mesh_info *mesh_info,
-        struct cgltf_mesh *mesh_data)
+void release_gltf_meshes(struct gltf_mesh_info *mesh_info)
 {
-        release_gltf_primitives(&mesh_info->primitive_info,
-                mesh_data->primitives);
+        release_gltf_primitives(&mesh_info->primitive_info);
 }
 
-void release_gltf_primitives(struct gltf_primitive_info *primitive_info,
-        struct cgltf_primitive *primitive_data)
+void release_gltf_primitives(struct gltf_primitive_info *primitive_info)
 {
         free(primitive_info->index_data);
 
-        release_gltf_attributes(&primitive_info->attribute_info,
-                primitive_data->attributes);
+        release_gltf_attributes(&primitive_info->attribute_info);
+
+        //release_gltf_materials(&primitive_info->material_info);
 }
 
-void release_gltf_attributes(struct gltf_attribute_info *attribute_info,
-        struct cgltf_attribute *attribute_data)
+void release_gltf_attributes(struct gltf_attribute_info *attribute_info)
 {
         free(attribute_info->attribute_data);
         free(attribute_info->attribute_type_data_stride);
         free(attribute_info->attribute_type_data_format);
         free(attribute_info->attribute_type_indexes);
         free((CHAR *) attribute_info->attribute_type_names);
+}
+
+void release_gltf_materials(struct gltf_material_info *material_info)
+{
+        free(material_info->base_texture_file_name);
+        free(material_info->metallic_roughness_texture_file_name);
+        free(material_info->diffuse_texture_file_name);
+        free(material_info->specular_glossiness_texture_file_name);
+        free(material_info->normal_texture_file_name);
+        free(material_info->occlusion_texture_file_name);
+        free(material_info->emissive_texture_file_name);
 }
 
 void release_gltf(struct cgltf_data *gltf_data)
