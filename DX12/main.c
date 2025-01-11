@@ -899,7 +899,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 blas_scratch_resource_info[i].flags =
                         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                 blas_scratch_resource_info[i].current_state =
-                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                        D3D12_RESOURCE_STATE_COMMON;
                 create_resource(&device_info, &blas_scratch_resource_info[i]);
 
                 rec_build_dxr_acceleration_struct(&render_cmd_list_info,
@@ -1006,7 +1006,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 tlas_scratch_resource_info[i].flags =
                         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                 tlas_scratch_resource_info[i].current_state =
-                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                        D3D12_RESOURCE_STATE_COMMON;
                 create_resource(&device_info, &tlas_scratch_resource_info[i]);
         }
 
@@ -1066,16 +1066,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         };
         SetWindowLongPtr(wnd_info.hwnd, GWLP_USERDATA, (LONG_PTR) wndproc_data);
 
-        struct gpu_sample_positions_info sample_positions_info;
-        sample_positions_info.num_pixels = 1;
-        sample_positions_info.num_samples_per_pixels = 1;
-        sample_positions_info.sample_positions[0].X = 1;
-        sample_positions_info.sample_positions[0].Y = 1;
-
-        struct gpu_sample_positions_info null_sample_positions_info;
-        null_sample_positions_info.num_pixels = 0;
-        null_sample_positions_info.num_samples_per_pixels = 0;
-
         UINT queued_window_msg = WM_NULL;
         do {
                 queued_window_msg = window_message_loop();
@@ -1095,21 +1085,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                 rec_clear_rtv_cmd(&render_cmd_list_info,
                         &tmp_rtv_descriptor_info, clear_color);
 
-                rec_set_sample_positions(&render_cmd_list_info,
-                        &sample_positions_info, FALSE);
-
                 // Clear depth target
                 rec_clear_dsv_cmd(&render_cmd_list_info,
                         &dsv_descriptor_info);
-
-                rec_set_sample_positions(&render_cmd_list_info,
-                        &null_sample_positions_info, TRUE);
-
-                rec_set_sample_positions(&render_cmd_list_info,
-                        &null_sample_positions_info, TRUE);
-
-                rec_set_sample_positions(&render_cmd_list_info,
-                        &sample_positions_info, FALSE);
 
                 // Set pipeline state
                 rec_set_pipeline_state_cmd(&render_cmd_list_info,

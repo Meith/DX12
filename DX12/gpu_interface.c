@@ -254,11 +254,14 @@ void create_descriptor(struct gpu_device_info *device_info,
 
         descriptor_info->cpu_handle = descriptor_info->base_cpu_handle;
 
-        ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(
-                descriptor_info->descriptor_heap,
-                &descriptor_info->base_gpu_handle);
+        if (heap_desc.Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
+        {
+                ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(
+                        descriptor_info->descriptor_heap,
+                        &descriptor_info->base_gpu_handle);
 
-        descriptor_info->gpu_handle = descriptor_info->base_gpu_handle;
+            descriptor_info->gpu_handle = descriptor_info->base_gpu_handle;
+        }
 
         result = ID3D12Object_SetName(descriptor_info->descriptor_heap,
                 descriptor_info->name);
@@ -373,7 +376,7 @@ void create_unorderd_access_view(struct gpu_device_info *device_info,
                         uav_desc.Texture2D.PlaneSlice = 0;
                         break;
 
-                default :
+                default:
                         break;
          };
 
